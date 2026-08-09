@@ -1,0 +1,5 @@
+- `[/]` Update `MusicService.kt` custom action icons
+- `[ ]` Create `notification_custom_player.xml` layout
+- `[ ]` Create `CustomNotificationLayout.kt` helper
+- `[ ]` Update `PlayerNotificationProvider.kt` to use custom layout and blur
+- `[ ]` Verify build and functionality

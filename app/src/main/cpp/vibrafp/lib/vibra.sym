@@ -1,0 +1,6 @@
+{
+  global:
+    Java_com_krish_jaatplayer_recognition_VibraSignature_*;
+  local:
+    *;
+};
