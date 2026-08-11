@@ -873,11 +873,11 @@ fun HomeScreen(
                 
                 
                 val base = when (section) {
-                    HomeSection.QuickPicks -> 1000
-                    HomeSection.SpeedDial,
+                    HomeSection.SpeedDial -> 1000
+                    HomeSection.KeepListening -> 950
+                    HomeSection.QuickPicks -> 900
                     HomeSection.DailyDiscover -> 500 
 
-                    HomeSection.KeepListening,
                     HomeSection.AccountPlaylists,
                     HomeSection.ForgottenFavorites,
                     HomeSection.FromTheCommunity -> 400 
@@ -907,12 +907,12 @@ fun HomeScreen(
             }
         } else {
             val defaultOrder = mapOf(
-                HomeSection.QuickPicks to 1000,
-                HomeSection.AiRecommendations to 900,
-                HomeSection.SpeedDial to 500,
+                HomeSection.SpeedDial to 1000,
+                HomeSection.KeepListening to 950,
+                HomeSection.QuickPicks to 900,
+                HomeSection.AiRecommendations to 850,
                 HomeSection.FromTheCommunity to 450,
                 HomeSection.DailyDiscover to 400,
-                HomeSection.KeepListening to 350,
                 HomeSection.AccountPlaylists to 300,
                 HomeSection.ForgottenFavorites to 250,
                 HomeSection.MoodAndGenres to 10

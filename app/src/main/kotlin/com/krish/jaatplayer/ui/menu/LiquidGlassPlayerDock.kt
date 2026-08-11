@@ -250,7 +250,7 @@ fun LiquidGlassPlayerDock(
 
 @Composable
 private fun DockTile(action: DockAction, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
-    val dismissingActions = setOf("Download", "Shuffle", "Repeat", "Advanced", "Add to Library")
+    val dismissingActions = setOf("Download", "Shuffle", "Advanced", "Add to Library")
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
