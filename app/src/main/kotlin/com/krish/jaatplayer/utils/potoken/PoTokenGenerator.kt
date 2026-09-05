@@ -149,9 +149,21 @@ class PoTokenGenerator {
 
         Timber.tag(TAG).d("poToken generated successfully: session=${streamingPot.take(20)}..., video=${playerPot.take(20)}...")
 
+        /*
+         * Content binding, per yt-dlp's `get_webpo_content_binding` and NewPipe's
+         * PoTokenProviderImpl:
+         *   - GVS context (the `pot=` appended to a googlevideo URL) -> bound to the SESSION,
+         *     i.e. dataSyncId when authenticated, visitor_data otherwise.
+         *   - PLAYER context (`serviceIntegrityDimensions` in the /player body) -> bound to the
+         *     video id, with WEB_REMIX special-cased back into the session branch.
+         *
+         * `streamingDataPoToken` is what gets appended as `pot=`, so it must be the SESSION-bound
+         * one (`streamingPot`), not `playerPot` (video-id bound) — that mismatch is what produced
+         * a `pot=` value googlevideo rejects with 403 on the very first byte.
+         */
         return PoTokenResult(
             playerRequestPoToken = streamingPot,
-            streamingDataPoToken = playerPot,
+            streamingDataPoToken = streamingPot,
         )
     }
 }

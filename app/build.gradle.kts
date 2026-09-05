@@ -34,7 +34,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 527
-        versionName = "1.5.6"
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -159,6 +159,8 @@ android {
             isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("String", "ARCHITECTURE", "\"debug\"")
+            ext.set("enableCrashlytics", false)
+            ext.set("alwaysUpdateBuildId", false)
         }
     }
 
@@ -238,6 +240,7 @@ protobuf {
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {

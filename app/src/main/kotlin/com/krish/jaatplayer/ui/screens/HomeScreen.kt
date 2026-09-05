@@ -1,9 +1,12 @@
 package com.krish.jaatplayer.ui.screens
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
-
-
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.border
+import com.krish.jaatplayer.playback.PlayerConnection
+import com.krish.jaatplayer.ui.component.MenuState
+import kotlinx.coroutines.CoroutineScope
+import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
@@ -43,11 +46,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.ui.util.lerp
+import kotlin.math.absoluteValue
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.carousel.CarouselItemScope
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
@@ -77,6 +84,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
@@ -186,17 +194,20 @@ private fun NavController.navigateToPlaylistItem(playlist: PlaylistItem) {
 }
 
 sealed class HomeSection(val id: String, val baseWeight: Int) {
-    data object SpeedDial : HomeSection("speed_dial", 100)
-    data object AiRecommendations : HomeSection("ai_recommendations", 95)
-    data object QuickPicks : HomeSection("quick_picks", 90)
-    data object DailyDiscover : HomeSection("daily_discover", 80)
-    data object KeepListening : HomeSection("keep_listening", 50)
-    data object AccountPlaylists : HomeSection("account_playlists", 40)
-    data object ForgottenFavorites : HomeSection("forgotten_favorites", 30)
-    data object FromTheCommunity : HomeSection("from_the_community", 20)
-    data class SimilarRecommendation(val index: Int) : HomeSection("similar_recommendation_$index", 10)
-    data class HomePageSection(val index: Int) : HomeSection("home_page_section_$index", 10)
-    data object MoodAndGenres : HomeSection("mood_and_genres", 5)
+    data object HeroBanner : HomeSection("hero_banner", 2000)
+    data object TasteHero : HomeSection("taste_hero", 2000)
+    data object DiscoveryHero : HomeSection("discovery_hero", 2000)
+    data object SpeedDial : HomeSection("speed_dial", 1000)
+    data object AiRecommendations : HomeSection("ai_recommendations", 950)
+    data object QuickPicks : HomeSection("quick_picks", 900)
+    data object DailyDiscover : HomeSection("daily_discover", 800)
+    data object KeepListening : HomeSection("keep_listening", 950)
+    data object AccountPlaylists : HomeSection("account_playlists", 300)
+    data object ForgottenFavorites : HomeSection("forgotten_favorites", 250)
+    data object FromTheCommunity : HomeSection("from_the_community", 450)
+    data class SimilarRecommendation(val index: Int) : HomeSection("similar_recommendation_$index", 600)
+    data class HomePageSection(val index: Int) : HomeSection("home_page_section_$index", 550)
+    data object MoodAndGenres : HomeSection("mood_and_genres", 10)
 }
 
 @Composable
@@ -549,8 +560,14 @@ fun DailyDiscoverCard(
                         messages[kotlin.math.abs(dailyDiscover.seed.id.hashCode()) % messages.size]
                     }
 
+                    val seedSubTitle = when (val seed = dailyDiscover.seed) {
+                        is SongItem -> seed.artists.joinToString(", ") { it.name }
+                        is AlbumItem -> seed.artists?.joinToString(", ") { it.name } ?: ""
+                        else -> ""
+                    }
+
                     Text(
-                        text = stringResource(messageRes, "${dailyDiscover.seed.title} • ${dailyDiscover.seed.artists.joinToString(", ") { it.name }}"),
+                        text = stringResource(messageRes, "${dailyDiscover.seed.title}${if (seedSubTitle.isNotEmpty()) " • $seedSubTitle" else ""}"),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
                         color = Color.White.copy(alpha = 0.6f),
@@ -563,6 +580,253 @@ fun DailyDiscoverCard(
     }
 }
 
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeHeroCarousel(
+    items: List<YTItem>,
+    designType: String,
+    navController: NavController,
+    playerConnection: PlayerConnection,
+    menuState: com.krish.jaatplayer.ui.component.MenuState,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    scope: kotlinx.coroutines.CoroutineScope,
+    title: String? = null
+) {
+    Column {
+        if (title != null) {
+            NavigationTitle(
+                title = title,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+        
+        when (designType) {
+            "A" -> {
+                HorizontalCenteredHeroCarousel(
+                    state = rememberCarouselState { items.size },
+                    maxItemWidth = 260.dp,
+                    itemSpacing = 8.dp,
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp)
+                ) { index ->
+                    HomeHeroItem(
+                        item = items[index],
+                        navController = navController,
+                        playerConnection = playerConnection,
+                        menuState = menuState,
+                        haptic = haptic,
+                        scope = scope
+                    )
+                }
+            }
+            "B" -> {
+                // Design B: 3D Stack Carousel
+                val pagerState = rememberPagerState { items.size }
+                HorizontalPager(
+                    state = pagerState,
+                    contentPadding = PaddingValues(horizontal = 80.dp),
+                    pageSpacing = (-32).dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                ) { page ->
+                    val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue
+                    
+                    Box(
+                        modifier = Modifier
+                            .graphicsLayer {
+                                val scale = lerp(
+                                    start = 0.82f,
+                                    stop = 1f,
+                                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                                )
+                                scaleX = scale
+                                scaleY = scale
+                                alpha = lerp(
+                                    start = 0.4f,
+                                    stop = 1f,
+                                    fraction = 1f - pageOffset.coerceIn(0f, 1f)
+                                )
+                                rotationY = lerp(
+                                    start = 0f,
+                                    stop = if (pagerState.currentPage > page) 20f else -20f,
+                                    fraction = pageOffset.coerceIn(0f, 1f)
+                                )
+                                translationX = if (pagerState.currentPage > page) 40f * pageOffset else -40f * pageOffset
+                            }
+                    ) {
+                        HeroItemWrapper {
+                            HomeHeroItem(
+                                item = items[page],
+                                navController = navController,
+                                playerConnection = playerConnection,
+                                menuState = menuState,
+                                haptic = haptic,
+                                scope = scope
+                            )
+                        }
+                    }
+                }
+            }
+            "C" -> {
+                // Design C: Square Panoramic Carousel
+                val pagerState = rememberPagerState { items.size }
+                HorizontalPager(
+                    state = pagerState,
+                    contentPadding = PaddingValues(horizontal = 48.dp),
+                    pageSpacing = 16.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                ) { page ->
+                    HeroItemWrapper {
+                        HomeHeroItem(
+                            item = items[page],
+                            navController = navController,
+                            playerConnection = playerConnection,
+                            menuState = menuState,
+                            haptic = haptic,
+                            scope = scope
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HeroItemWrapper(content: @Composable CarouselItemScope.() -> Unit) {
+    // This is a dummy wrapper that provides CarouselItemScope
+    HorizontalCenteredHeroCarousel(
+        state = rememberCarouselState { 1 },
+        modifier = Modifier.fillMaxSize(),
+        content = { content() }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CarouselItemScope.HomeHeroItem(
+    item: YTItem,
+    navController: NavController,
+    playerConnection: PlayerConnection,
+    menuState: com.krish.jaatplayer.ui.component.MenuState,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    val shape = RoundedCornerShape(32.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .maskClip(shape)
+            .maskBorder(
+                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape
+            )
+            .combinedClickable(
+                onClick = {
+                    when (item) {
+                        is SongItem -> playerConnection.playQueue(
+                            YouTubeQueue(
+                                item.endpoint ?: WatchEndpoint(videoId = item.id),
+                                item.toMediaMetadata()
+                            )
+                        )
+                        is AlbumItem -> navController.navigate("album/${item.id}")
+                        is ArtistItem -> navController.navigate("artist/${item.id}")
+                        is PlaylistItem -> navController.navigateToPlaylistItem(item)
+                    }
+                },
+                onLongClick = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    menuState.show {
+                        when (item) {
+                            is SongItem -> YouTubeSongMenu(
+                                song = item,
+                                navController = navController,
+                                onDismiss = menuState::dismiss
+                            )
+                            is AlbumItem -> YouTubeAlbumMenu(
+                                albumItem = item,
+                                navController = navController,
+                                onDismiss = menuState::dismiss
+                            )
+                            is ArtistItem -> YouTubeArtistMenu(
+                                artist = item,
+                                onDismiss = menuState::dismiss
+                            )
+                            is PlaylistItem -> YouTubePlaylistMenu(
+                                playlist = item,
+                                coroutineScope = scope,
+                                onDismiss = menuState::dismiss
+                            )
+                        }
+                    }
+                }
+            )
+    ) {
+        AsyncImage(
+            model = coil3.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                .data(item.thumbnail?.resize(1200, 1200))
+                .memoryCachePolicy(coil3.request.CachePolicy.ENABLED)
+                .diskCachePolicy(coil3.request.CachePolicy.ENABLED)
+                .networkCachePolicy(coil3.request.CachePolicy.ENABLED)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.6f)
+                        )
+                    )
+                )
+        )
+        
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp)
+        ) {
+            Text(
+                text = when(item) {
+                    is SongItem -> item.title
+                    is AlbumItem -> item.title
+                    is ArtistItem -> item.title
+                    is PlaylistItem -> item.title
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = when(item) {
+                    is SongItem -> item.artists.joinToString { it.name }
+                    is AlbumItem -> item.artists?.joinToString { it.name } ?: ""
+                    is ArtistItem -> stringResource(R.string.artist)
+                    is PlaylistItem -> item.author?.name ?: ""
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.8f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -590,6 +854,7 @@ fun HomeScreen(
     val explorePage by viewModel.explorePage.collectAsState()
     val dailyDiscover by viewModel.dailyDiscover.collectAsState()
     val communityPlaylists by viewModel.communityPlaylists.collectAsState()
+    val tasteRecommendations by viewModel.tasteRecommendations.collectAsState()
 
     val allLocalItems by viewModel.allLocalItems.collectAsState()
     val allYtItems by viewModel.allYtItems.collectAsState()
@@ -840,10 +1105,15 @@ fun HomeScreen(
         similarRecommendations,
         homePage?.sections,
         explorePage?.moodAndGenres,
-        aiRecommendedPlaylist
+        aiRecommendedPlaylist,
+        tasteRecommendations
     ) {
         val list = mutableListOf<HomeSection>()
 
+        if (homePage?.sections?.isNotEmpty() == true || !quickPicks.isNullOrEmpty()) list.add(HomeSection.HeroBanner)
+        if (tasteRecommendations.isNotEmpty() || keepListening?.any { it is Song } == true || !quickPicks.isNullOrEmpty()) list.add(HomeSection.TasteHero)
+        if (dailyDiscover?.isNotEmpty() == true || !forgottenFavorites.isNullOrEmpty() || !quickPicks.isNullOrEmpty()) list.add(HomeSection.DiscoveryHero)
+        
         if (showSpeedDial && speedDialItems.isNotEmpty()) list.add(HomeSection.SpeedDial)
         if (aiRecommendedPlaylist != null && aiRecommendedPlaylist!!.second.isNotEmpty()) list.add(HomeSection.AiRecommendations)
         if (quickPicks?.isNotEmpty() == true) list.add(HomeSection.QuickPicks)
@@ -857,75 +1127,67 @@ fun HomeScreen(
             list.add(HomeSection.SimilarRecommendation(i))
         }
 
-        homePage?.sections?.indices?.forEach { i ->
+        homePage?.sections?.indices?.drop(if (homePage?.sections?.isNotEmpty() == true) 1 else 0)?.forEach { i ->
             list.add(HomeSection.HomePageSection(i))
         }
 
         if (explorePage?.moodAndGenres != null) list.add(HomeSection.MoodAndGenres)
 
-        if (randomizeHomeOrder) {
-            list.sortedByDescending { section ->
-                
-                
-                
+        val defaultOrder = mutableMapOf(
+            HomeSection.AiRecommendations to 850,
+            HomeSection.FromTheCommunity to 450,
+            HomeSection.DailyDiscover to 400,
+            HomeSection.AccountPlaylists to 300,
+            HomeSection.ForgottenFavorites to 250,
+            HomeSection.MoodAndGenres to 10
+        )
+
+        // 3-way Hero swapping logic
+        val heroList = listOf(HomeSection.HeroBanner, HomeSection.TasteHero, HomeSection.DiscoveryHero)
+        val shuffledHeroes = heroList.shuffled(Random(randomSeed))
+        val h1 = shuffledHeroes[0]
+        val h2 = shuffledHeroes[1]
+        val h3 = shuffledHeroes[2]
+
+        // Design shuffling logic
+        val designPool = listOf("A", "B", "C").shuffled(Random(randomSeed))
+        val heroToDesign = mapOf(
+            h1 to designPool[0],
+            h2 to designPool[1],
+            h3 to designPool[2]
+        )
+
+        list.sortedByDescending { section ->
+            if (randomizeHomeOrder) {
                 val sectionRandom = Random(randomSeed + section.id.hashCode())
-
-                
-                
                 val base = when (section) {
+                    h1 -> 2000
                     HomeSection.SpeedDial -> 1000
+                    h2 -> 975
                     HomeSection.KeepListening -> 950
+                    h3 -> 925
                     HomeSection.QuickPicks -> 900
-                    HomeSection.DailyDiscover -> 500 
-
+                    HomeSection.DailyDiscover -> 500
                     HomeSection.AccountPlaylists,
                     HomeSection.ForgottenFavorites,
-                    HomeSection.FromTheCommunity -> 400 
-
-                    else -> 600 
+                    HomeSection.FromTheCommunity -> 400
+                    else -> 600
                 }
-
-                val modifier = when (section) {
-                    
-                    
-                    HomeSection.QuickPicks -> 0
-                    HomeSection.SpeedDial,
-                    HomeSection.DailyDiscover -> sectionRandom.nextInt(-200, 400)
-
-                    
-                    
-                    
-                    HomeSection.KeepListening,
-                    HomeSection.AccountPlaylists,
-                    HomeSection.ForgottenFavorites,
-                    HomeSection.FromTheCommunity -> sectionRandom.nextInt(-100, 400)
-
-                    
-                    else -> sectionRandom.nextInt(-50, 50)
-                }
-                base + modifier
-            }
-        } else {
-            val defaultOrder = mapOf(
-                HomeSection.SpeedDial to 1000,
-                HomeSection.KeepListening to 950,
-                HomeSection.QuickPicks to 900,
-                HomeSection.AiRecommendations to 850,
-                HomeSection.FromTheCommunity to 450,
-                HomeSection.DailyDiscover to 400,
-                HomeSection.AccountPlaylists to 300,
-                HomeSection.ForgottenFavorites to 250,
-                HomeSection.MoodAndGenres to 10
-            )
-
-            list.sortedByDescending { section ->
-                when(section) {
+                base + sectionRandom.nextInt(-20, 20)
+            } else {
+                when (section) {
+                    h1 -> 2000
+                    HomeSection.SpeedDial -> 1000
+                    h2 -> 975
+                    HomeSection.KeepListening -> 950
+                    h3 -> 925
+                    HomeSection.QuickPicks -> 900
                     is HomeSection.SimilarRecommendation -> 600 - section.index
                     is HomeSection.HomePageSection -> 550 - section.index
                     else -> defaultOrder[section] ?: 0
                 }
             }
-        }
+        }.map { it to (heroToDesign[it] ?: "A") }
     }
 
     LaunchedEffect(quickPicks) {
@@ -973,6 +1235,12 @@ fun HomeScreen(
                 )
             }
 
+            // Hero sections should surface songs you're not already seeing in Speed Dial or
+            // Keep Listening, not repeat them.
+            val excludedFromHeroIds = remember(speedDialItems, keepListening) {
+                (speedDialItems.map { it.id } + keepListening.orEmpty().map { it.id }).toSet()
+            }
+
             LazyColumn(
                 state = lazylistState,
                 contentPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues()
@@ -1011,9 +1279,133 @@ fun HomeScreen(
                     }
                 }
 
-
-                homeSections.forEach { section ->
+                homeSections.forEach { pair ->
+                    val (section, design) = pair
                     when (section) {
+                        HomeSection.HeroBanner -> {
+                            val heroSection = homePage?.sections?.firstOrNull { 
+                                it.items.any { item -> item is SongItem } 
+                            } ?: homePage?.sections?.firstOrNull()
+                            
+                            val homeSongItems = heroSection?.items?.filterIsInstance<SongItem>() ?: emptyList()
+                            // YouTube's home feed is mostly playlist/mix/album shelves, not raw song
+                            // shelves — this filter comes up empty most of the time regardless of
+                            // network success. Fall back to local quick picks (no network dependency,
+                            // pure DB query) so this hero reliably has something to show instead of
+                            // depending on the home feed happening to contain a song-shaped shelf.
+                            val quickPicksAsSongItems = quickPicks.orEmpty().map { song ->
+                                SongItem(
+                                    id = song.id,
+                                    title = song.title,
+                                    artists = song.artists.map { com.music.innertube.models.Artist(name = it.name, id = it.id) },
+                                    thumbnail = song.thumbnailUrl ?: "",
+                                    explicit = false
+                                )
+                            }
+                            val songItems = homeSongItems.ifEmpty { quickPicksAsSongItems }
+                                .filterNot { it.id in excludedFromHeroIds }
+                            val bannerTitle = if (homeSongItems.isNotEmpty()) heroSection?.title else null
+                            
+                            if (songItems.isNotEmpty()) {
+                                item(key = "hero_banner") {
+                                    HomeHeroCarousel(
+                                        items = songItems,
+                                        designType = design,
+                                        navController = navController,
+                                        playerConnection = playerConnection,
+                                        menuState = menuState,
+                                        haptic = haptic,
+                                        scope = scope,
+                                        title = bannerTitle
+                                    )
+                                }
+                            }
+                        }
+                        HomeSection.TasteHero -> {
+                            val networkSongItems = tasteRecommendations.filterIsInstance<SongItem>()
+                            val localFallbackSongItems = keepListening.orEmpty()
+                                .filterIsInstance<Song>()
+                                .map { song ->
+                                    SongItem(
+                                        id = song.id,
+                                        title = song.title,
+                                        artists = song.artists.map { com.music.innertube.models.Artist(name = it.name, id = it.id) },
+                                        thumbnail = song.thumbnailUrl ?: "",
+                                        explicit = false
+                                    )
+                                }
+                            // Final guaranteed fallback: quickPicks is the same list HeroBanner
+                            // falls back to, but reversed so the two don't show an identical
+                            // carousel when nothing else has loaded yet — this hero should always
+                            // have something once the library has any songs in it at all.
+                            val guaranteedFallbackSongItems = quickPicks.orEmpty().reversed().map { song ->
+                                SongItem(
+                                    id = song.id,
+                                    title = song.title,
+                                    artists = song.artists.map { com.music.innertube.models.Artist(name = it.name, id = it.id) },
+                                    thumbnail = song.thumbnailUrl ?: "",
+                                    explicit = false
+                                )
+                            }
+                            val songItems = networkSongItems.ifEmpty { localFallbackSongItems }.ifEmpty { guaranteedFallbackSongItems }
+                            if (songItems.isNotEmpty()) {
+                                item(key = "taste_hero") {
+                                    HomeHeroCarousel(
+                                        items = songItems,
+                                        designType = design,
+                                        navController = navController,
+                                        playerConnection = playerConnection,
+                                        menuState = menuState,
+                                        haptic = haptic,
+                                        scope = scope,
+                                        title = "Based on your recent taste"
+                                    )
+                                }
+                            }
+                        }
+                        HomeSection.DiscoveryHero -> {
+                            val networkSongItems = dailyDiscover.orEmpty()
+                                .map { it.recommendation }
+                                .filterIsInstance<SongItem>()
+                            val localFallbackSongItems = forgottenFavorites.orEmpty().map { song ->
+                                SongItem(
+                                    id = song.id,
+                                    title = song.title,
+                                    artists = song.artists.map { com.music.innertube.models.Artist(name = it.name, id = it.id) },
+                                    thumbnail = song.thumbnailUrl ?: "",
+                                    explicit = false
+                                )
+                            }
+                            // Final guaranteed fallback, same reasoning as TasteHero above —
+                            // shuffled with a fixed different order (dropped/rotated) so all three
+                            // heroes don't ever render the exact same carousel.
+                            val guaranteedFallbackSongItems = quickPicks.orEmpty().let { list ->
+                                if (list.size > 1) list.drop(list.size / 2) + list.take(list.size / 2) else list
+                            }.map { song ->
+                                SongItem(
+                                    id = song.id,
+                                    title = song.title,
+                                    artists = song.artists.map { com.music.innertube.models.Artist(name = it.name, id = it.id) },
+                                    thumbnail = song.thumbnailUrl ?: "",
+                                    explicit = false
+                                )
+                            }
+                            val songItems = networkSongItems.ifEmpty { localFallbackSongItems }.ifEmpty { guaranteedFallbackSongItems }
+                            if (songItems.isNotEmpty()) {
+                                item(key = "discovery_hero") {
+                                    HomeHeroCarousel(
+                                        items = songItems,
+                                        designType = design,
+                                        navController = navController,
+                                        playerConnection = playerConnection,
+                                        menuState = menuState,
+                                        haptic = haptic,
+                                        scope = scope,
+                                        title = "Daily Discovery"
+                                    )
+                                }
+                            }
+                        }
                         HomeSection.SpeedDial -> {
                             speedDialItems.takeIf { it.isNotEmpty() }?.let { items ->
                                 item(key = "speed_dial_title") {
@@ -1842,7 +2234,9 @@ fun HomeScreen(
                                     }
                                 }
                             }
-
+                        }
+                        else -> {
+                            // Handle other sections if needed or just skip
                         }
                     }
                 }

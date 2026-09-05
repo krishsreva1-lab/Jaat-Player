@@ -27,6 +27,8 @@ import com.krish.jaatplayer.constants.HideExplicitKey
 import com.krish.jaatplayer.constants.HideVideoSongsKey
 import com.krish.jaatplayer.constants.HideYoutubeShortsKey
 import com.krish.jaatplayer.constants.InnerTubeCookieKey
+import com.krish.jaatplayer.constants.PreferredArtistsKey
+import com.krish.jaatplayer.constants.PreferredLanguagesKey
 import com.krish.jaatplayer.constants.QuickPicks
 import com.krish.jaatplayer.constants.QuickPicksKey
 import com.krish.jaatplayer.db.MusicDatabase
@@ -41,6 +43,7 @@ import com.krish.jaatplayer.utils.SyncUtils
 import com.krish.jaatplayer.utils.dataStore
 import com.krish.jaatplayer.utils.get
 import com.krish.jaatplayer.utils.reportException
+import com.krish.jaatplayer.models.toMediaMetadata
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -54,13 +57,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 import kotlin.random.Random
 
 data class DailyDiscoverItem(
-    val seed: Song,
+    val seed: YTItem,
     val recommendation: YTItem,
     val relatedEndpoint: BrowseEndpoint?
 )
@@ -93,6 +97,7 @@ class HomeViewModel @Inject constructor(
     val homePage = MutableStateFlow<HomePage?>(null)
     val explorePage = MutableStateFlow<ExplorePage?>(null)
     val communityPlaylists = MutableStateFlow<List<CommunityPlaylistItem>?>(null)
+    val tasteRecommendations = MutableStateFlow<List<YTItem>>(emptyList())
     val selectedChip = MutableStateFlow<HomePage.Chip?>(null)
     private val previousHomePage = MutableStateFlow<HomePage?>(null)
 
@@ -254,50 +259,170 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun getDailyDiscover() {
         val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+        val recentlyPlayed = database.events().first().take(10).map { it.song }.distinctBy { it.id }
         val likedSongs = database.likedSongsByCreateDateAsc().first()
-        if (likedSongs.isEmpty()) return
+        val preferredLanguages = context.dataStore.get(PreferredLanguagesKey, emptySet<String>())
+        val preferredArtists = context.dataStore.get(PreferredArtistsKey, emptySet<String>())
 
-        val seeds = likedSongs.shuffled().distinctBy { it.id }.take(5)
-
-        
-        val items = java.util.Collections.synchronizedList(mutableListOf<DailyDiscoverItem>())
-
-        kotlinx.coroutines.coroutineScope {
-            seeds.map { seed ->
-                launch(Dispatchers.IO) {
-                    val endpoint = YouTube.next(WatchEndpoint(videoId = seed.id)).getOrNull()?.relatedEndpoint
-                    if (endpoint != null) {
-                        YouTube.related(endpoint).onSuccess { page ->
-                            val recommendations = page.songs
-                                .filter { item ->
-                                    if (hideVideoSongs && item.isVideoSong) return@filter false
-                                    if (item.explicit) return@filter false
-                                    true
-                                }
-                                .shuffled()
-
-                            
-                            val recommendation = recommendations.firstOrNull { rec ->
-                                rec.id != seed.id
-                            }
-
-                            if (recommendation != null) {
-                                items.add(
-                                    DailyDiscoverItem(
-                                        seed = seed,
-                                        recommendation = recommendation,
-                                        relatedEndpoint = endpoint
-                                    )
-                                )
+        // Previously this seeded only from likedSongs, so a song you'd merely played (not
+        // explicitly liked) never influenced this section — it fell straight through to generic
+        // "Global Top 50" style queries. Recently PLAYED songs now take priority, same signal
+        // getTasteRecommendations() already uses, so this personalizes from the very first song
+        // you play, not just from songs you've liked.
+        val seeds = if (recentlyPlayed.isNotEmpty()) {
+            recentlyPlayed.take(1).map { song ->
+                SongItem(
+                    id = song.id,
+                    title = song.title,
+                    artists = song.artists.map { com.music.innertube.models.Artist(name = it.name, id = it.id) },
+                    thumbnail = song.thumbnailUrl ?: "",
+                    explicit = false
+                )
+            }
+        } else if (likedSongs.isEmpty() && preferredArtists.isEmpty()) {
+            // No liked songs and no preferred artists, use languages or default trending
+            val trendingQueries = if (preferredLanguages.isNotEmpty()) {
+                preferredLanguages.map { "$it latest hits" }
+            } else {
+                listOf("Global Top 50", "Trending Music English", "New Punjabi Songs", "Top Hindi Hits")
+            }
+            val fallbackSeeds = java.util.Collections.synchronizedList(mutableListOf<YTItem>())
+            coroutineScope {
+                trendingQueries.map { query ->
+                    launch(Dispatchers.IO) {
+                        YouTube.search(query, filter = YouTube.SearchFilter.FILTER_SONG).onSuccess { page ->
+                            fallbackSeeds.addAll(page.items.filterIsInstance<SongItem>().take(2))
+                        }
+                    }
+                }.forEach { it.join() }
+            }
+            fallbackSeeds.toList().shuffled()
+        } else if (likedSongs.isEmpty()) {
+            // Use preferred artists as seeds
+            val artistSeeds = java.util.Collections.synchronizedList(mutableListOf<YTItem>())
+            coroutineScope {
+                preferredArtists.take(10).map { artistId ->
+                    launch(Dispatchers.IO) {
+                        YouTube.artist(artistId).onSuccess { page ->
+                            page.sections.firstOrNull { it.items.any { it is SongItem } }?.items?.filterIsInstance<SongItem>()?.take(2)?.let {
+                                artistSeeds.addAll(it)
                             }
                         }
                     }
-                }
-            }.forEach { it.join() }
+                }.forEach { it.join() }
+            }
+            artistSeeds.toList().shuffled()
+        } else {
+            likedSongs.shuffled().distinctBy { it.id }.take(10).map { song ->
+                SongItem(
+                    id = song.id,
+                    title = song.title,
+                    artists = song.artists.map { com.music.innertube.models.Artist(name = it.name, id = it.id) },
+                    thumbnail = song.thumbnailUrl ?: "",
+                    explicit = false
+                )
+            }
         }
 
-        
+        val singleSeed = seeds.firstOrNull()
+        val items = java.util.Collections.synchronizedList(mutableListOf<DailyDiscoverItem>())
+
+        if (singleSeed != null) {
+            suspend fun attempt(): Boolean {
+                val endpoint = YouTube.next(WatchEndpoint(videoId = singleSeed.id)).getOrNull()?.relatedEndpoint
+                    ?: return false
+                val page = YouTube.related(endpoint).getOrNull() ?: return false
+                val recommendations = page.songs
+                    .filter { item ->
+                        if (hideVideoSongs && item.isVideoSong) return@filter false
+                        if (item.explicit) return@filter false
+                        item.id != singleSeed.id
+                    }
+                    .shuffled()
+
+                // One related-songs page from a single seed easily has enough songs for a whole
+                // hero carousel — no need for several seeds just to get enough items.
+                recommendations.forEach { recommendation ->
+                    items.add(
+                        DailyDiscoverItem(
+                            seed = singleSeed,
+                            recommendation = recommendation,
+                            relatedEndpoint = endpoint
+                        )
+                    )
+                }
+                return recommendations.isNotEmpty()
+            }
+
+            // Mirrors the same bot-detection recovery already used for playback resolution
+            // and related-song caching — retry once with a fresh guest session before giving up.
+            if (!attempt()) {
+                runCatching { com.krish.jaatplayer.utils.BotDetectionMitigator.rotateGuestSession() }
+                attempt()
+            }
+        }
+
         dailyDiscover.value = items.toList().distinctBy { it.recommendation.id }.shuffled()
+    }
+
+    private suspend fun getTasteRecommendations() {
+        val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
+        val hideExplicit = context.dataStore.get(HideExplicitKey, false)
+        val preferredLanguages = context.dataStore.get(PreferredLanguagesKey, emptySet<String>())
+        
+        val recentEvents = database.events().first()
+        val recommendations = java.util.Collections.synchronizedList(mutableListOf<YTItem>())
+
+        // Same YouTube.next()+related() call the app's own "play similar songs next" radio
+        // feature uses for a single song — this needs only ONE song's history, not a built-up
+        // pool of several, so it works the moment you've played anything at all.
+        val seed = recentEvents.firstOrNull()?.song
+        if (seed != null) {
+            suspend fun attempt(): Boolean {
+                val nextResult = YouTube.next(WatchEndpoint(videoId = seed.id)).getOrNull()
+                val relatedEndpoint = nextResult?.relatedEndpoint ?: return false
+                val page = YouTube.related(relatedEndpoint).getOrNull() ?: return false
+                val items = page.songs
+                    .filterExplicit(hideExplicit)
+                    .filterVideoSongs(hideVideoSongs)
+                    .filter { it.id != seed.id }
+                recommendations.addAll(items)
+                return items.isNotEmpty()
+            }
+
+            // Mirrors the same bot-detection recovery already used for playback resolution.
+            if (!attempt()) {
+                runCatching { com.krish.jaatplayer.utils.BotDetectionMitigator.rotateGuestSession() }
+                attempt()
+            }
+        } else {
+            // Fallback Diverse Pool (Punjabi, English, Hindi, Trending, Global)
+            val queries = if (preferredLanguages.isNotEmpty()) {
+                preferredLanguages.map { "$it latest songs 2026" }
+            } else {
+                listOf(
+                    "Punjabi latest songs 2026", 
+                    "Billboard Hot 100", 
+                    "Global Viral Hits", 
+                    "New English Pop", 
+                    "Top Trending Music India",
+                    "Coke Studio Pakistan",
+                    "UK Top 40",
+                    "Latin Music Hits"
+                )
+            }
+            coroutineScope {
+                queries.shuffled().take(5).map { query ->
+                    launch(Dispatchers.IO) {
+                        YouTube.search(query, filter = YouTube.SearchFilter.FILTER_SONG).onSuccess { page ->
+                            recommendations.addAll(page.items.filterIsInstance<SongItem>().take(6))
+                        }
+                    }
+                }.forEach { it.join() }
+            }
+        }
+        
+        tasteRecommendations.value = recommendations.toList().distinctBy { it.id }.shuffled()
     }
 
     private suspend fun getQuickPicks() {
@@ -328,10 +453,16 @@ class HomeViewModel @Inject constructor(
                 }
 
                 
-                val combined = (relatedSongs + forgotten + ytSimilarSongs)
+                // forgotten used to be mixed in at equal weight with relatedSongs/ytSimilarSongs
+                // and the whole thing shuffled — when the fresh, taste-based signal (relatedSongs/
+                // ytSimilarSongs) was thin, old long-unplayed songs from "forgotten" could end up
+                // dominating the shuffle, which is why old/default-feeling songs kept surfacing
+                // here even with plenty of recent listening history. Recent taste now gets priority
+                // and "forgotten" is capped to a small minority of the final list.
+                val recentTasteBased = (relatedSongs + ytSimilarSongs).distinctBy { it.id }.shuffled()
+                val combined = (recentTasteBased.take(16) + forgotten.shuffled().take(4))
                     .distinctBy { it.id }
                     .shuffled()
-                    .take(20)
 
                 quickPicks.value = combined.ifEmpty { relatedSongs.shuffled().take(20) }
             }
@@ -346,8 +477,12 @@ class HomeViewModel @Inject constructor(
 
     private suspend fun getCommunityPlaylists() {
         val fromTimeStamp = System.currentTimeMillis() - 86400000L * 7 * 4
-        val artistSeeds = database.mostPlayedArtists(fromTimeStamp, limit = 10).first()
+        val preferredArtists = context.dataStore.get(PreferredArtistsKey, emptySet<String>())
+
+        val artistSeeds = (database.mostPlayedArtists(fromTimeStamp, limit = 10).first()
             .filter { it.artist.isYouTubeArtist }
+            .map { it.id } + preferredArtists)
+            .distinct()
             .shuffled().take(3)
         val songSeeds = database.mostPlayedSongs(fromTimeStamp, limit = 5).first()
             .shuffled().take(2)
@@ -355,15 +490,14 @@ class HomeViewModel @Inject constructor(
         val candidatePlaylists = java.util.Collections.synchronizedList(mutableListOf<PlaylistItem>())
 
         kotlinx.coroutines.coroutineScope {
-            artistSeeds.map { seed ->
+            artistSeeds.map { artistId ->
                 launch(Dispatchers.IO) {
-                    YouTube.artist(seed.id).onSuccess { page ->
+                    YouTube.artist(artistId).onSuccess { page ->
                         page.sections.forEach { section ->
                             section.items.filterIsInstance<PlaylistItem>().forEach { playlist ->
                                 if (playlist.author?.name != "YouTube Music" &&
                                     playlist.author?.name != "YouTube" &&
                                     playlist.author?.name != "Playlist" &&
-                                    playlist.author?.name != seed.artist.name &&
                                     !playlist.id.startsWith("RD") &&
                                     !playlist.id.startsWith("OLAK")
                                 ) {
@@ -531,32 +665,51 @@ class HomeViewModel @Inject constructor(
         val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
         val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, false)
 
-        coroutineScope {
-            launch(Dispatchers.IO) { getDailyDiscover() }
-            launch(Dispatchers.IO) { getCommunityPlaylists() }
-            launch(Dispatchers.IO) { loadSimilarRecommendations() }
+        // supervisorScope, not coroutineScope: these fetches are independent. With plain
+        // coroutineScope, ANY one of these throwing (community playlists, similar recommendations,
+        // etc.) cancels every sibling immediately — including all three hero fetches, even mid-retry.
+        // That structured-concurrency cancellation, not bot detection, was silently taking down
+        // all three heroes together.
+        supervisorScope {
+            launch(Dispatchers.IO) { runCatching { getDailyDiscover() }.onFailure { reportException(it) } }
+            launch(Dispatchers.IO) { runCatching { getCommunityPlaylists() }.onFailure { reportException(it) } }
+            launch(Dispatchers.IO) { runCatching { loadSimilarRecommendations() }.onFailure { reportException(it) } }
+            launch(Dispatchers.IO) { runCatching { getTasteRecommendations() }.onFailure { reportException(it) } }
             launch(Dispatchers.IO) {
-                YouTube.home(params = selectedChip.value?.endpoint?.params).onSuccess { page ->
-                    homePage.value = page.copy(
-                        sections = page.sections.mapNotNull { section ->
-                            val filteredItems = section.items
-                                .filterExplicit(hideExplicit)
-                                .filterVideoSongs(hideVideoSongs)
-                                .filterYoutubeShorts(hideYoutubeShorts)
-                            if (filteredItems.isEmpty()) null else section.copy(items = filteredItems)
-                        }
-                    )
+                runCatching {
+                    fun applyHomePage(page: com.music.innertube.pages.HomePage) {
+                        homePage.value = page.copy(
+                            sections = page.sections.mapNotNull { section ->
+                                val filteredItems = section.items
+                                    .filterExplicit(hideExplicit)
+                                    .filterVideoSongs(hideVideoSongs)
+                                    .filterYoutubeShorts(hideYoutubeShorts)
+                                if (filteredItems.isEmpty()) null else section.copy(items = filteredItems)
+                            }
+                        )
+                    }
+
+                    var result = YouTube.home(params = selectedChip.value?.endpoint?.params)
+                    if (result.isFailure) {
+                        // Mirrors the same bot-detection recovery already used for playback resolution
+                        // and related-song caching — retry once with a fresh guest session before giving up.
+                        runCatching { com.krish.jaatplayer.utils.BotDetectionMitigator.rotateGuestSession() }
+                        result = YouTube.home(params = selectedChip.value?.endpoint?.params)
+                    }
+                    result.onSuccess { page -> applyHomePage(page) }
                 }.onFailure { reportException(it) }
             }
             launch(Dispatchers.IO) {
-                YouTube.explore().onSuccess { page ->
-                    explorePage.value = page.copy(
-                        newReleaseAlbums = page.newReleaseAlbums.filterExplicit(hideExplicit)
-                    )
+                runCatching {
+                    YouTube.explore().onSuccess { page ->
+                        explorePage.value = page.copy(
+                            newReleaseAlbums = page.newReleaseAlbums.filterExplicit(hideExplicit)
+                        )
+                    }.onFailure { reportException(it) }
                 }.onFailure { reportException(it) }
             }
             if (YouTube.cookie != null) {
-                launch(Dispatchers.IO) { loadAccountPlaylists() }
+                launch(Dispatchers.IO) { runCatching { loadAccountPlaylists() }.onFailure { reportException(it) } }
             }
         }
 
@@ -568,12 +721,14 @@ class HomeViewModel @Inject constructor(
     private suspend fun load() {
         isLoading.value = true
 
-        
-        loadLocalDataPhase()
+        // Each phase is isolated so a failure in one (e.g. a local database query) can never
+        // silently prevent the other from running — previously an uncaught exception in
+        // loadLocalDataPhase() would kill this whole coroutine before loadNetworkDataPhase()
+        // (which feeds all three hero sections) ever got a chance to execute.
+        runCatching { loadLocalDataPhase() }.onFailure { reportException(it) }
         isLoading.value = false
 
-        
-        loadNetworkDataPhase()
+        runCatching { loadNetworkDataPhase() }.onFailure { reportException(it) }
     }
 
     private val _isLoadingMore = MutableStateFlow(false)

@@ -16,16 +16,12 @@ import androidx.media3.common.PlaybackException
 import com.music.innertube.NewPipeExtractor
 import com.music.innertube.YouTube
 import com.music.innertube.models.YouTubeClient
-import com.music.innertube.models.YouTubeClient.Companion.ANDROID_CREATOR
 import com.music.innertube.models.YouTubeClient.Companion.ANDROID_VR_1_65_10
-import com.music.innertube.models.YouTubeClient.Companion.ANDROID_VR_1_61_48
-import com.music.innertube.models.YouTubeClient.Companion.ANDROID_VR_NO_AUTH
+import com.music.innertube.models.YouTubeClient.Companion.ANDROID_VR_1_43_32
 import com.music.innertube.models.YouTubeClient.Companion.IOS
 import com.music.innertube.models.YouTubeClient.Companion.IPADOS
-import com.music.innertube.models.YouTubeClient.Companion.MOBILE
 import com.music.innertube.models.YouTubeClient.Companion.TVHTML5
-import com.music.innertube.models.YouTubeClient.Companion.TVHTML5_SIMPLY_EMBEDDED_PLAYER
-import com.music.innertube.models.YouTubeClient.Companion.WEB
+import com.music.innertube.models.YouTubeClient.Companion.VISIONOS
 import com.music.innertube.models.YouTubeClient.Companion.WEB_CREATOR
 import com.music.innertube.models.YouTubeClient.Companion.WEB_REMIX
 import com.music.innertube.models.response.PlayerResponse
@@ -81,17 +77,24 @@ object YTPlayerUtils {
 
     // Single flat, ordered fallback list tried for EVERY track — no content-type branching, no
     // category can end up starved of a working client.
+    //
+    // Reordered against the Echo Music reference build's measured results:
+    // - VISIONOS is the only client measured to serve a whole file start-to-finish; it now leads.
+    // - ANDROID_VR_1_61_48 and TVHTML5_SIMPLY_EMBEDDED_PLAYER are dropped: both are confirmed dead
+    //   (bot-gated / "no longer supported" respectively) and only cost a round trip on every
+    //   resolution that had to pass through them.
+    // - IPADOS/IOS serve only a ~1 MiB preview (playback dies after ~30-90s) and are kept as a
+    //   last resort rather than up front.
+    // - WEB_REMIX is included here as a PoToken-based fallback (MAIN_CLIENT is ANDROID_VR, which
+    //   needs no PoToken); this only became reliable once the PoTokenGenerator field-swap bug
+    //   (playerRequestPoToken/streamingDataPoToken) was fixed.
     private val STREAM_FALLBACK_CLIENTS: Array<YouTubeClient> = arrayOf(
-        ANDROID_VR_1_61_48,
-        WEB_REMIX,
-        TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+        VISIONOS,
         TVHTML5,
-        ANDROID_CREATOR,
+        WEB_REMIX,
+        ANDROID_VR_1_43_32,
         IPADOS,
-        ANDROID_VR_NO_AUTH,
-        MOBILE,
         IOS,
-        WEB,
         WEB_CREATOR,
     )
 

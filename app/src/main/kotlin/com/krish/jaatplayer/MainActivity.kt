@@ -183,6 +183,7 @@ import android.util.Log
 import androidx.compose.ui.platform.LocalContext
 import com.krish.jaatplayer.constants.PauseListenHistoryKey
 import com.krish.jaatplayer.constants.PauseSearchHistoryKey
+import com.krish.jaatplayer.constants.SetupCompletedKey
 import com.krish.jaatplayer.constants.PureBlackKey
 import com.krish.jaatplayer.constants.SYSTEM_DEFAULT
 import com.krish.jaatplayer.constants.SelectedThemeColorKey
@@ -620,6 +621,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 val (useNewMiniPlayerDesign) = rememberPreference(UseNewMiniPlayerDesignKey, defaultValue = true)
+                val (setupCompleted) = rememberPreference(SetupCompletedKey, defaultValue = false)
                 val defaultOpenTab = remember {
                     dataStore[DefaultOpenTabKey].toEnum(defaultValue = NavigationTab.HOME)
                 }
@@ -673,6 +675,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val shouldShowNavigationBar = remember(currentRoute, navigationItemRoutes) {
+                    if (currentRoute == Screens.Setup.route) return@remember false
                     currentRoute == null ||
                         navigationItemRoutes.contains(currentRoute) ||
                         currentRoute!!.startsWith("search/") ||
@@ -1102,7 +1105,9 @@ class MainActivity : ComponentActivity() {
                                         playerBottomSheetState.collapseSoft()
                                     }
 
-                                    if (isSelected) {
+                                    val isExactRoot = navController.currentDestination?.route == screen.route
+
+                                    if (isExactRoot) {
                                         navController.currentBackStackEntry?.savedStateHandle?.set("scrollToTop", true)
                                         coroutineScope.launch {
                                             topAppBarScrollBehavior.state.resetHeightOffset()
@@ -1110,10 +1115,11 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         navController.navigate(screen.route) {
                                             popUpTo(navController.graph.startDestinationId) {
-                                                saveState = true
+                                                inclusive = false
+                                                saveState = false
                                             }
                                             launchSingleTop = true
-                                            restoreState = true
+                                            restoreState = false
                                         }
                                     }
                                 }
@@ -1258,7 +1264,9 @@ class MainActivity : ComponentActivity() {
                                         playerBottomSheetState.collapseSoft()
                                     }
 
-                                    if (isSelected) {
+                                    val isExactRoot = navController.currentDestination?.route == screen.route
+
+                                    if (isExactRoot) {
                                         navController.currentBackStackEntry?.savedStateHandle?.set("scrollToTop", true)
                                         coroutineScope.launch {
                                             topAppBarScrollBehavior.state.resetHeightOffset()
@@ -1266,10 +1274,11 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         navController.navigate(screen.route) {
                                             popUpTo(navController.graph.startDestinationId) {
-                                                saveState = true
+                                                inclusive = false
+                                                saveState = false
                                             }
                                             launchSingleTop = true
-                                            restoreState = true
+                                            restoreState = false
                                         }
                                     }
                                 }
@@ -1296,7 +1305,7 @@ class MainActivity : ComponentActivity() {
                                 
                                 NavHost(
                                     navController = navController,
-                                    startDestination = when (tabOpenedFromShortcut ?: defaultOpenTab) {
+                                    startDestination = if (!setupCompleted) Screens.Setup.route else when (tabOpenedFromShortcut ?: defaultOpenTab) {
                                         NavigationTab.HOME -> Screens.Home
                                         NavigationTab.LIBRARY -> Screens.Library
                                         else -> Screens.Home

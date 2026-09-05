@@ -80,6 +80,10 @@ fun NavGraphBuilder.navigationBuilder(
         HomeScreen(navController = navController, snackbarHostState = snackbarHostState)
     }
 
+    composable(Screens.Setup.route) {
+        SetupScreen(navController = navController)
+    }
+
 
 
 

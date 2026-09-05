@@ -98,6 +98,15 @@
     <string name="now_playing">Now Playing</string>
 
     <string name="lyrics">Lyrics</string>
+    <string name="setup">Setup</string>
+    <string name="welcome_to_jaat_player">Welcome to Jaat Player</string>
+    <string name="choose_languages">Choose your preferred languages</string>
+    <string name="choose_artists">Choose at least 3 artists you like</string>
+    <string name="finish">Finish</string>
+    <string name="punjabi">Punjabi</string>
+    <string name="haryanvi">Haryanvi</string>
+    <string name="hindi">Hindi</string>
+    <string name="english">English</string>
     <string name="close">Close</string>
     <string name="minimum_volume">Minimum Volume</string>
     <string name="maximum_volume">Maximum Volume</string>
