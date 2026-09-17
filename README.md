@@ -84,16 +84,13 @@ Jaat Player delivers a seamless, premium listening experience by leveraging YouT
 
 ## Features
 
-### What's New
-- **Lossless Music Hub** — Stream and contribute 16-bit/24-bit FLAC files directly to the Jaat Player ecosystem.
-- **Data Saver Mode (Beta)** — Automatically reduces data usage during playback for limited connections.
-- **Settings Search Index** — Quickly find and navigate to any settings option instantly.
-- **Redesigned UI** — Cleaner, faster, and more intuitive interface from the ground up.
-- **Import from Spotify** — Bring your playlists and tracks over with ease.
-- **Listen Together** — Sync music in real time, similar to Spotify Jam.
-- **Podcast Support** — Listen to podcasts alongside your music library.
-- **Local Media Support** — Play music files stored directly on your device.
-- **Dynamic Island Support** — Enhanced playback notifications on supported Android devices.
+### What's New in v1.8.0
+- **Diamond Spark Music Recognition (Shazam)** — Redesigned Shazam button & Quick Settings tile with adaptive theme colors. Background song recognition from videos/reels.
+- **Liquid Glass UI & Per-Menu Toggles** — Custom frosted glass backdrops across navigation bar, mini player, and menus with individual per-menu Liquid Glass toggles in Settings.
+- **Equalizer Glass Card & 3D Reverb** — Quick-access square glass card on player screen with 1-tap mode cycling. Added 3D Normal/Concert/Techno reverb and Jaat Styles (Adaptive Bass, Auto-Mashup, 8D Swirl, DJ Filter).
+- **Home Screen Support Pop-Up** — Interactive donation dialog with theme-adaptive styling and smart reminders.
+- **Fluid Spring Motion** — Upgraded screen transitions and button animations with spring-driven fluid physics.
+- **Build Performance** — Upgraded Gradle JVM memory and multi-threaded parallel Kotlin compilation.
 
 ### Streaming & Playback
 - **Ad-Free** — Stream without any interruptions.
