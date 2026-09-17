@@ -90,6 +90,7 @@ fun LiquidGlassPlayerDock(
     navController: NavController,
     onDismiss: () -> Unit,
     onMore: () -> Unit,
+    onOpenEqualizerGlass: (() -> Unit)? = null,
 ) {
     val menuGlassConfig = LocalMenuGlassConfig.current
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -140,7 +141,18 @@ fun LiquidGlassPlayerDock(
             DockAction(
                 icon = R.drawable.equalizer,
                 label = "Equalizer",
-                onClick = { navController.navigate("equalizer"); onDismiss() }
+                onClick = {
+                    if (menuGlassConfig.isEnabledFor(GlassMenu.EQUALIZER)) {
+                        if (onOpenEqualizerGlass != null) {
+                            onOpenEqualizerGlass()
+                        } else {
+                            navController.navigate("equalizer_glass")
+                        }
+                    } else {
+                        navController.navigate("settings/equalizer")
+                    }
+                    onDismiss()
+                }
             ),
             DockAction(
                 icon = R.drawable.tune,

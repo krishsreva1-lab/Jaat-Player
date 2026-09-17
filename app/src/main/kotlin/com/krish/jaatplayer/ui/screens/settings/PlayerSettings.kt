@@ -119,6 +119,10 @@ highlightKey: String? = null) {
         AutomixDebugOverlayKey,
         defaultValue = false
     )
+    val (jaatStylesDebugOverlay, onJaatStylesDebugOverlayChange) = rememberPreference(
+        com.krish.jaatplayer.constants.JaatStylesDebugOverlayKey,
+        defaultValue = true
+    )
     val (crossfadeGapless, onCrossfadeGaplessChange) = rememberPreference(
         CrossfadeGaplessKey,
         defaultValue = true
@@ -338,8 +342,13 @@ highlightKey: String? = null) {
                 title = { Text("Enable Lossless Audio?") },
                 buttons = {
                     TextButton(onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://jaatplayer.fun/donate"))
-                        context.startActivity(intent)
+                        val upiUri = Uri.parse("upi://pay?pa=9887624399@fam&pn=Jaat%20Player&tn=Support%20Jaat%20Player&cu=INR")
+                        val intent = Intent(Intent.ACTION_VIEW, upiUri)
+                        try {
+                            context.startActivity(Intent.createChooser(intent, "Pay with UPI"))
+                        } catch (_: Exception) {
+                            android.widget.Toast.makeText(context, "No UPI app found on device", android.widget.Toast.LENGTH_SHORT).show()
+                        }
                     }) {
                         Text("Donate")
                     }
@@ -365,8 +374,13 @@ highlightKey: String? = null) {
                 title = { Text("Enable Lossless Downloads?") },
                 buttons = {
                     TextButton(onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://jaatplayer.fun/donate"))
-                        context.startActivity(intent)
+                        val upiUri = Uri.parse("upi://pay?pa=9887624399@fam&pn=Jaat%20Player&tn=Support%20Jaat%20Player&cu=INR")
+                        val intent = Intent(Intent.ACTION_VIEW, upiUri)
+                        try {
+                            context.startActivity(Intent.createChooser(intent, "Pay with UPI"))
+                        } catch (_: Exception) {
+                            android.widget.Toast.makeText(context, "No UPI app found on device", android.widget.Toast.LENGTH_SHORT).show()
+                        }
                     }) {
                         Text("Donate")
                     }
@@ -593,6 +607,28 @@ highlightKey: String? = null) {
                             onClick = { onAutomixDebugOverlayChange(!automixDebugOverlay) }
                         ))
                     }
+
+                    add(Material3SettingsItem(
+                        icon = painterResource(R.drawable.bug_report),
+                        title = { Text("Jaat Styles Debug Overlay") },
+                        description = { Text("Show live Jaat Styles DSP metrics & status on player") },
+                        trailingContent = {
+                            Switch(
+                                checked = jaatStylesDebugOverlay,
+                                onCheckedChange = onJaatStylesDebugOverlayChange,
+                                thumbContent = {
+                                    Icon(
+                                        painter = painterResource(
+                                            id = if (jaatStylesDebugOverlay) R.drawable.check else R.drawable.close
+                                        ),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                                    )
+                                }
+                            )
+                        },
+                        onClick = { onJaatStylesDebugOverlayChange(!jaatStylesDebugOverlay) }
+                    ))
                 }
                 add(Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.history_duration)),

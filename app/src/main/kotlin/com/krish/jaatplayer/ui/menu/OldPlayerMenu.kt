@@ -70,7 +70,9 @@ import com.krish.jaatplayer.models.MediaMetadata
 import com.krish.jaatplayer.models.toMediaMetadata
 import com.krish.jaatplayer.playback.ExoDownloadService
 import com.krish.jaatplayer.ui.component.BottomSheetState
+import com.krish.jaatplayer.ui.component.GlassMenu
 import com.krish.jaatplayer.ui.component.ListDialog
+import com.krish.jaatplayer.ui.component.LocalMenuGlassConfig
 import com.krish.jaatplayer.ui.component.Material3MenuGroup
 import com.krish.jaatplayer.ui.component.Material3MenuItemData
 import com.krish.jaatplayer.ui.component.NewAction
@@ -88,6 +90,7 @@ fun OldPlayerMenu(
     playerBottomSheetState: BottomSheetState,
     onShowDetailsDialog: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenEqualizerGlass: (() -> Unit)? = null,
 ) {
     mediaMetadata ?: return
     val context = LocalContext.current
@@ -95,6 +98,7 @@ fun OldPlayerMenu(
     val playerConnection = LocalPlayerConnection.current ?: return
     val coroutineScope = rememberCoroutineScope()
     val playerVolume = playerConnection.service.playerVolume.collectAsState()
+    val menuGlassConfig = LocalMenuGlassConfig.current
 
     
     val castHandler = remember(playerConnection) {
@@ -738,7 +742,15 @@ fun OldPlayerMenu(
                                 )
                             },
                             onClick = {
-                                navController.navigate("equalizer")
+                                if (menuGlassConfig.isEnabledFor(GlassMenu.EQUALIZER)) {
+                                    if (onOpenEqualizerGlass != null) {
+                                        onOpenEqualizerGlass()
+                                    } else {
+                                        navController.navigate("equalizer_glass")
+                                    }
+                                } else {
+                                    navController.navigate("settings/equalizer")
+                                }
                                 onDismiss()
                             }
                         )

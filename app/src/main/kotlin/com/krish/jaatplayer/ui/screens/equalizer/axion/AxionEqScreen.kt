@@ -30,6 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.krish.jaatplayer.R
+import com.krish.jaatplayer.constants.JaatBassSubMode
+import com.krish.jaatplayer.constants.JaatStyleMode
+import com.krish.jaatplayer.eq.audio.Reverb3DPreset
 import com.krish.jaatplayer.eq.data.SavedEQProfile
 import com.krish.jaatplayer.ui.component.Material3SettingsGroup
 import com.krish.jaatplayer.ui.component.Material3SettingsItem
@@ -175,6 +178,7 @@ private fun SimpleEqMode(
     isDirty: Boolean,
     onSaveClick: () -> Unit
 ) {
+    val reverbPreset by viewModel.reverbPreset.collectAsState()
     
     var bass by remember { mutableFloatStateOf(0f) }
     var mid by remember { mutableFloatStateOf(0f) }
@@ -317,6 +321,198 @@ private fun SimpleEqMode(
         }
         PresetSection(stringResource(R.string.eq_label_dolby), dolbyPresets, null, enabled, viewModel, bandGains)
         PresetSection(stringResource(R.string.eq_label_dirac), diracPresets, null, enabled, viewModel, bandGains)
+
+        ReverbSection(
+            reverbPreset = reverbPreset,
+            onReverbPresetChange = { viewModel.setReverbPreset(it) },
+            enabled = enabled
+        )
+
+        JaatStylesSection(
+            enabled = enabled,
+            viewModel = viewModel,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun JaatStylesSection(
+    enabled: Boolean,
+    viewModel: AxionEqViewModel,
+) {
+    val jaatStylesEnabled by viewModel.jaatStylesEnabled.collectAsState()
+    val jaatStyleMode by viewModel.jaatStyleMode.collectAsState()
+    val jaatStylesIntensity by viewModel.jaatStylesIntensity.collectAsState()
+
+    val styleOptions = listOf(
+        JaatStyleMode.BASS_DROP to "Adaptive Bass",
+        JaatStyleMode.MASHUP to "Auto-Mashup",
+        JaatStyleMode.SPATIAL_8D to "8D Swirl",
+        JaatStyleMode.FILTER_SWEEP to "DJ Filter",
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Jaat Styles",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+
+            Switch(
+                checked = jaatStylesEnabled && enabled,
+                onCheckedChange = { viewModel.setJaatStylesEnabled(it) },
+                enabled = enabled
+            )
+        }
+
+        if (jaatStylesEnabled && enabled) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            ) {
+                styleOptions.forEachIndexed { index, (mode, label) ->
+                    ToggleButton(
+                        checked = jaatStyleMode == mode,
+                        onCheckedChange = { viewModel.setJaatStyleMode(mode) },
+                        enabled = enabled,
+                        shapes = when {
+                            index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            index == styleOptions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        },
+                        modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+                        contentPadding = PaddingValues(horizontal = 2.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+
+            if (jaatStyleMode == JaatStyleMode.BASS_DROP) {
+                val jaatStylesBassSubMode by viewModel.jaatStylesBassSubMode.collectAsState()
+                val bassSubModeOptions = listOf(
+                    JaatBassSubMode.BEAT_ADAPTIVE to "Beat Adaptive",
+                    JaatBassSubMode.RANDOM_TIMER to "Random Timer (5s+)",
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                ) {
+                    bassSubModeOptions.forEachIndexed { index, (subMode, label) ->
+                        ToggleButton(
+                            checked = jaatStylesBassSubMode == subMode,
+                            onCheckedChange = { viewModel.setJaatStylesBassSubMode(subMode) },
+                            enabled = enabled,
+                            shapes = when {
+                                index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                else -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            },
+                            modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "FX Depth",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${(jaatStylesIntensity * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Slider(
+                    value = jaatStylesIntensity,
+                    onValueChange = { viewModel.setJaatStylesIntensity(it) },
+                    valueRange = 0f..1f,
+                    enabled = enabled
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ReverbSection(
+    reverbPreset: Reverb3DPreset,
+    onReverbPresetChange: (Reverb3DPreset) -> Unit,
+    enabled: Boolean,
+) {
+    val options = listOf(
+        Reverb3DPreset.NONE to "Off",
+        Reverb3DPreset.NORMAL to "3D Normal",
+        Reverb3DPreset.CONCERT to "3D Concert",
+        Reverb3DPreset.TECHNO to "3D Techno",
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "3D Reverb Effects",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        ) {
+            options.forEachIndexed { index, (preset, label) ->
+                ToggleButton(
+                    checked = reverbPreset == preset,
+                    onCheckedChange = { if (enabled) onReverbPresetChange(preset) },
+                    enabled = enabled,
+                    shapes = when {
+                        index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        index == options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    },
+                    modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+                    contentPadding = PaddingValues(horizontal = 4.dp)
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
     }
 }
 

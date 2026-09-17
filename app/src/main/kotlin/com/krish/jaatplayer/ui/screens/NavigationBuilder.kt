@@ -65,6 +65,7 @@ import com.krish.jaatplayer.utils.rememberEnumPreference
 import com.krish.jaatplayer.utils.rememberPreference
 import com.krish.jaatplayer.jaat.changelog.ChangelogScreen
 import com.krish.jaatplayer.jaat.commitscreen.CommitScreen
+import com.krish.jaatplayer.ui.component.EqualizerGlassCard
 import com.krish.jaatplayer.ui.screens.settings.JaatExtractorScreen
 import com.krish.jaatplayer.ui.screens.equalizer.axion.AxionEqScreen
 import com.krish.jaatplayer.ui.screens.ambient.AmbientModeScreen
@@ -483,6 +484,16 @@ fun NavGraphBuilder.navigationBuilder(
 
     dialog("equalizer") {
         EqScreen(navController = navController)
+    }
+
+    dialog("equalizer_glass") {
+        EqualizerGlassCard(
+            onOpenAdvancedEq = {
+                navController.navigate("settings/equalizer") {
+                    popUpTo("equalizer_glass") { inclusive = true }
+                }
+            }
+        )
     }
 
     composable("recognition") {

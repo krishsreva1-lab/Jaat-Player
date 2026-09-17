@@ -12,11 +12,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import com.krish.jaatplayer.constants.AutoLoadMoreKey
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -1350,6 +1352,24 @@ fun LocalPlaylistHeader(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            val (endlessQueueEnabled, onEndlessQueueChange) = rememberPreference(AutoLoadMoreKey, defaultValue = true)
+            IconButton(
+                onClick = { onEndlessQueueChange(!endlessQueueEnabled) },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        color = if (endlessQueueEnabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        shape = CircleShape
+                    )
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.sparks),
+                    contentDescription = "Endless Queue",
+                    tint = if (endlessQueueEnabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp)
                 )
             }
 

@@ -27,6 +27,7 @@ tasks.register<Delete>("clean") {
 subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
+            freeCompilerArgs.add("-Xbackend-threads=0")
             if (project.findProperty("enableComposeCompilerReports") == "true") {
                 arrayOf("reports", "metrics").forEach {
                     freeCompilerArgs.add("-P")

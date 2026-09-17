@@ -32,7 +32,10 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -977,11 +980,13 @@ class MainActivity : ComponentActivity() {
                 val (liquidGlassSpeakerMenuEnabled) = rememberPreference(LiquidGlassSpeakerMenuEnabledKey, defaultValue = false)
                 val (liquidGlassSpeedMenuEnabled) = rememberPreference(LiquidGlassSpeedMenuEnabledKey, defaultValue = false)
                 val (liquidGlassSleepTimerMenuEnabled) = rememberPreference(LiquidGlassSleepTimerMenuEnabledKey, defaultValue = false)
+                val (liquidGlassEqualizerMenuEnabled) = rememberPreference(LiquidGlassEqualizerMenuEnabledKey, defaultValue = true)
                 val menuGlassConfig = remember(
                     liquidGlassStyleStr, liquidGlassMenuBlurRadius, liquidGlassMenuVibrancy,
                     liquidGlassMenuLensHeight, liquidGlassMenuLensAmount, liquidGlassPlayerMenuEnabled,
                     liquidGlassQueueMenuEnabled, liquidGlassQualityMenuEnabled, liquidGlassSpeakerMenuEnabled,
-                    liquidGlassSpeedMenuEnabled, liquidGlassSleepTimerMenuEnabled, liquidGlassAdoptThemeColor,
+                    liquidGlassSpeedMenuEnabled, liquidGlassSleepTimerMenuEnabled, liquidGlassEqualizerMenuEnabled,
+                    liquidGlassAdoptThemeColor,
                 ) {
                     MenuGlassConfig(
                         style = GlassStyle.fromPref(liquidGlassStyleStr),
@@ -996,6 +1001,7 @@ class MainActivity : ComponentActivity() {
                         speakerMenuEnabled = liquidGlassSpeakerMenuEnabled,
                         speedMenuEnabled = liquidGlassSpeedMenuEnabled,
                         sleepTimerMenuEnabled = liquidGlassSleepTimerMenuEnabled,
+                        equalizerMenuEnabled = liquidGlassEqualizerMenuEnabled,
                     )
                 }
 
@@ -1320,11 +1326,13 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         if (currentRouteIndex == -1 || currentRouteIndex > previousRouteIndex)
-                                            slideInHorizontally { it / 8 } + fadeIn(tween(200))
+                                            slideInHorizontally(animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) { it / 6 } +
+                                                fadeIn(animationSpec = tween(280, easing = FastOutSlowInEasing))
                                         else
-                                            slideInHorizontally { -it / 8 } + fadeIn(tween(200))
+                                            slideInHorizontally(animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) { -it / 6 } +
+                                                fadeIn(animationSpec = tween(280, easing = FastOutSlowInEasing))
                                     },
-                                    
+
                                     exitTransition = {
                                         val currentRouteIndex = navigationItems.indexOfFirst {
                                             it.route == initialState.destination.route
@@ -1334,11 +1342,13 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         if (targetRouteIndex == -1 || targetRouteIndex > currentRouteIndex)
-                                            slideOutHorizontally { -it / 8 } + fadeOut(tween(200))
+                                            slideOutHorizontally(animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) { -it / 6 } +
+                                                fadeOut(animationSpec = tween(240, easing = FastOutSlowInEasing))
                                         else
-                                            slideOutHorizontally { it / 8 } + fadeOut(tween(200))
+                                            slideOutHorizontally(animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) { it / 6 } +
+                                                fadeOut(animationSpec = tween(240, easing = FastOutSlowInEasing))
                                     },
-                                    
+
                                     popEnterTransition = {
                                         val currentRouteIndex = navigationItems.indexOfFirst {
                                             it.route == targetState.destination.route
@@ -1348,11 +1358,13 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         if (previousRouteIndex != -1 && previousRouteIndex < currentRouteIndex)
-                                            slideInHorizontally { it / 8 } + fadeIn(tween(200))
+                                            slideInHorizontally(animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) { it / 6 } +
+                                                fadeIn(animationSpec = tween(280, easing = FastOutSlowInEasing))
                                         else
-                                            slideInHorizontally { -it / 8 } + fadeIn(tween(200))
+                                            slideInHorizontally(animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) { -it / 6 } +
+                                                fadeIn(animationSpec = tween(280, easing = FastOutSlowInEasing))
                                     },
-                                    
+
                                     popExitTransition = {
                                         val currentRouteIndex = navigationItems.indexOfFirst {
                                             it.route == initialState.destination.route
@@ -1362,9 +1374,11 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         if (currentRouteIndex != -1 && currentRouteIndex < targetRouteIndex)
-                                            slideOutHorizontally { -it / 8 } + fadeOut(tween(200))
+                                            slideOutHorizontally(animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) { -it / 6 } +
+                                                fadeOut(animationSpec = tween(240, easing = FastOutSlowInEasing))
                                         else
-                                            slideOutHorizontally { it / 8 } + fadeOut(tween(200))
+                                            slideOutHorizontally(animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) { it / 6 } +
+                                                fadeOut(animationSpec = tween(240, easing = FastOutSlowInEasing))
                                     },
                                     modifier = Modifier
                                         .layerBackdrop(appBackdrop)

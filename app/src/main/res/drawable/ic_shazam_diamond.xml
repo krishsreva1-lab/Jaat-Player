@@ -1,0 +1,52 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- Outer 4-Point Diamond Spark Body -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="
+            M 12,1
+            C 12,7.5 7.5,12 1,12
+            C 7.5,12 12,16.5 12,23
+            C 12,16.5 16.5,12 23,12
+            C 16.5,12 12,7.5 12,1
+            Z" />
+
+    <!-- Inner 5 Vertical Sound Wave Strips -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="
+            M 7.2,10
+            A 0.8,0.8 0 0 1 8.8,10
+            V 14
+            A 0.8,0.8 0 0 1 7.2,14
+            Z
+
+            M 9.4,7.5
+            A 0.8,0.8 0 0 1 11.0,7.5
+            V 16.5
+            A 0.8,0.8 0 0 1 9.4,16.5
+            Z
+
+            M 11.6,5
+            A 0.8,0.8 0 0 1 13.2,5
+            V 19
+            A 0.8,0.8 0 0 1 11.6,19
+            Z
+
+            M 13.8,7
+            A 0.8,0.8 0 0 1 15.4,7
+            V 17
+            A 0.8,0.8 0 0 1 13.8,17
+            Z
+
+            M 16.0,9.5
+            A 0.8,0.8 0 0 1 17.6,9.5
+            V 14.5
+            A 0.8,0.8 0 0 1 16.0,14.5
+            Z" />
+
+</vector>

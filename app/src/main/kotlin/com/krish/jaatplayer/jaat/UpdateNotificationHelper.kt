@@ -11,12 +11,12 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import com.krish.jaatplayer.R
 
 object UpdateNotificationHelper {
     private const val CHANNEL_ID = "updates"
     private const val NOTIFICATION_ID = 1001
+    const val ACTION_OPEN_UPDATE_MENU = "com.krish.jaatplayer.action.OPEN_UPDATE_MENU"
 
     fun showUpdateNotification(context: Context, versionName: String) {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -30,13 +30,10 @@ object UpdateNotificationHelper {
             nm.createNotificationChannel(channel)
         }
 
-        
-        val apkUrl = if (versionName.contains("nightly", ignoreCase = true)) {
-            "https://nightly.link/JaatPlayerApp/workflows/nightly.yml/main/jaatplayer-gms-nightly.zip"
-        } else {
-            "https://github.com/krishsreva1-lab/Jaat-Player/releases/download/$versionName/jaatplayer.apk"
+        val intent = Intent(context, com.krish.jaatplayer.MainActivity::class.java).apply {
+            action = ACTION_OPEN_UPDATE_MENU
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-        val intent = Intent(Intent.ACTION_VIEW, apkUrl.toUri())
 
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val pending = PendingIntent.getActivity(context, NOTIFICATION_ID, intent, flags)

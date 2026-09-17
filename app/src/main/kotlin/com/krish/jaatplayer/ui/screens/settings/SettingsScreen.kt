@@ -54,6 +54,7 @@ import com.krish.jaatplayer.ui.component.Material3SettingsItem
 import com.krish.jaatplayer.ui.screens.Screens
 import com.krish.jaatplayer.ui.utils.backToMain
 import com.krish.jaatplayer.jaat.updater.getUpdateAvailableState
+import com.krish.jaatplayer.ui.component.SupportProjectCard
 
 
 @OptIn(ExperimentalMaterial3Api::class)

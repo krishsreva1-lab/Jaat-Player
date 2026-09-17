@@ -53,6 +53,7 @@ import android.net.Uri
 import android.provider.Settings
 import android.os.Build
 import android.widget.Toast
+import com.krish.jaatplayer.ui.component.SupportProjectCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -136,6 +137,36 @@ highlightKey: String? = null) {
                         title = "About Developer",
                         subtitle = "Know more about me",
                         onClick = { uriHandler.openUri("https://jaatplayerr.netlify.app/") },
+                    )
+                }
+            }
+
+            item {
+                AboutSectionCard(title = "Community") {
+                    AboutActionRow(
+                        icon = painterResource(R.drawable.ic_telegram_new),
+                        title = "Telegram Channel",
+                        subtitle = "t.me/jaatplayerr",
+                        onClick = { uriHandler.openUri("https://t.me/jaatplayerr") },
+                    )
+                }
+            }
+
+            item {
+                AboutSectionCard(title = "Support & Donate") {
+                    AboutActionRow(
+                        icon = painterResource(R.drawable.currency_rupee_upi),
+                        title = "Donate via UPI",
+                        subtitle = "GPay / PhonePe / Paytm / BHIM",
+                        onClick = {
+                            val upiUri = Uri.parse("upi://pay?pa=9887624399@fam&pn=Jaat%20Player&tn=Support%20Jaat%20Player&cu=INR")
+                            val intent = Intent(Intent.ACTION_VIEW, upiUri)
+                            try {
+                                context.startActivity(Intent.createChooser(intent, "Pay with UPI"))
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "No UPI app found on device", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                     )
                 }
             }

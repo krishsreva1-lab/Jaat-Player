@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.krish.jaatplayer.eq.EqualizerService
+import com.krish.jaatplayer.eq.Reverb3DService
+import com.krish.jaatplayer.eq.audio.Reverb3DPreset
 import com.krish.jaatplayer.eq.data.EQProfileRepository
 import com.krish.jaatplayer.eq.data.FilterType
 import com.krish.jaatplayer.eq.data.ParametricEQBand
@@ -16,16 +18,77 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import androidx.datastore.preferences.core.edit
+import com.krish.jaatplayer.utils.dataStore
+import com.krish.jaatplayer.constants.JaatBassSubMode
+import com.krish.jaatplayer.constants.JaatStyleMode
+import com.krish.jaatplayer.constants.JaatStylesBassSubModeKey
+import com.krish.jaatplayer.constants.JaatStylesEnabledKey
+import com.krish.jaatplayer.constants.JaatStylesIntensityKey
+import com.krish.jaatplayer.constants.JaatStylesModeKey
 import javax.inject.Inject
 
 @HiltViewModel
 class AxionEqViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val equalizerService: EqualizerService,
+    private val reverb3DService: Reverb3DService,
     private val eqProfileRepository: EQProfileRepository
 ) : ViewModel() {
 
     private val prefs = context.getSharedPreferences("jaat_eq_prefs", Context.MODE_PRIVATE)
+
+    val jaatStylesEnabled = context.dataStore.data.map { it[JaatStylesEnabledKey] ?: false }
+        .stateIn(viewModelScope, SharingStarted.Lazily, false)
+
+    val jaatStyleMode = context.dataStore.data.map {
+        val modeStr = it[JaatStylesModeKey] ?: "BASS_DROP"
+        runCatching { JaatStyleMode.valueOf(modeStr) }.getOrDefault(JaatStyleMode.BASS_DROP)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, JaatStyleMode.BASS_DROP)
+
+    val jaatStylesIntensity = context.dataStore.data.map { it[JaatStylesIntensityKey] ?: 0.7f }
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0.7f)
+
+    val jaatStylesBassSubMode = context.dataStore.data.map {
+        val subModeStr = it[JaatStylesBassSubModeKey] ?: "BEAT_ADAPTIVE"
+        runCatching { JaatBassSubMode.valueOf(subModeStr) }.getOrDefault(JaatBassSubMode.BEAT_ADAPTIVE)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, JaatBassSubMode.BEAT_ADAPTIVE)
+
+    fun setJaatStylesEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.dataStore.edit { it[JaatStylesEnabledKey] = enabled }
+        }
+    }
+
+    fun setJaatStyleMode(mode: JaatStyleMode) {
+        viewModelScope.launch {
+            context.dataStore.edit { it[JaatStylesModeKey] = mode.name }
+        }
+    }
+
+    fun setJaatStylesIntensity(intensity: Float) {
+        viewModelScope.launch {
+            context.dataStore.edit { it[JaatStylesIntensityKey] = intensity }
+        }
+    }
+
+    fun setJaatStylesBassSubMode(subMode: JaatBassSubMode) {
+        viewModelScope.launch {
+            context.dataStore.edit { it[JaatStylesBassSubModeKey] = subMode.name }
+        }
+    }
+
+    private val _reverbPreset = MutableStateFlow(
+        runCatching { Reverb3DPreset.valueOf(prefs.getString("reverb_preset", null) ?: "NONE") }
+            .getOrDefault(Reverb3DPreset.NONE)
+    )
+    val reverbPreset = _reverbPreset.asStateFlow()
+
+    fun setReverbPreset(preset: Reverb3DPreset) {
+        _reverbPreset.value = preset
+        prefs.edit().putString("reverb_preset", preset.name).apply()
+        reverb3DService.applyPreset(preset)
+    }
 
     private val _enabled = MutableStateFlow(prefs.getBoolean("enabled", false))
     val enabled = _enabled.asStateFlow()
@@ -50,6 +113,9 @@ class AxionEqViewModel @Inject constructor(
     init {
         if (_enabled.value) {
             applyToService()
+        }
+        if (_reverbPreset.value != Reverb3DPreset.NONE) {
+            reverb3DService.applyPreset(_reverbPreset.value)
         }
     }
 

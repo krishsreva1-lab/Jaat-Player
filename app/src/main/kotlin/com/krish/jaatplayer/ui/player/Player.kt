@@ -19,7 +19,9 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -28,6 +30,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
@@ -67,6 +71,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -231,6 +237,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import android.view.TextureView
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -259,6 +266,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.geometry.Size
+import com.krish.jaatplayer.constants.LiquidGlassEqCardEnabledKey
+import com.krish.jaatplayer.ui.component.EqualizerGlassCard
+
 
 private data class WavyShape(
     val sides: Int,
@@ -351,6 +361,9 @@ fun BottomSheetPlayer(
     val isAutomixing by playerConnection.isAutomixing.collectAsState()
     val automixDebug by playerConnection.automixDebugInfo.collectAsState()
     val automixDebugOverlayEnabled by rememberPreference(com.krish.jaatplayer.constants.AutomixDebugOverlayKey, false)
+    val jaatStylesDebug by playerConnection.jaatStylesDebugInfo.collectAsState()
+    val jaatStylesDebugOverlayEnabled by rememberPreference(com.krish.jaatplayer.constants.JaatStylesDebugOverlayKey, true)
+    val liquidGlassEqCardEnabled by rememberPreference(LiquidGlassEqCardEnabledKey, defaultValue = true)
 
     var currentAudioFormat by remember { mutableStateOf<androidx.media3.common.Format?>(null) }
     DisposableEffect(playerConnection, isCrossfading) {
@@ -506,6 +519,62 @@ fun BottomSheetPlayer(
                                 (dbg.tempoRatio?.let { "  ×%.3f".format(it) } ?: ""),
                             style = mono, color = Color.White.copy(alpha = 0.85f)
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    val jaatStylesDebugOverlay: @Composable () -> Unit = {
+        if (jaatStylesDebugOverlayEnabled) {
+            jaatStylesDebug?.let { dbg ->
+                if (dbg.isEnabled) {
+                    val mono = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    )
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = PlayerHorizontalPadding, vertical = 4.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .padding(6.dp)
+                    ) {
+                        Text("JAAT STYLES  [${dbg.mode.name} - ${dbg.intensityPercent}%]", style = mono, color = MaterialTheme.colorScheme.primary)
+                        when (dbg.mode) {
+                            com.krish.jaatplayer.constants.JaatStyleMode.BASS_DROP -> {
+                                Text(
+                                    "Sub-mode: ${dbg.bassSubMode.name}  |  Hold Timer: %.1fs".format(dbg.holdSecondsRemaining),
+                                    style = mono, color = Color.White.copy(alpha = 0.85f)
+                                )
+                                Text(
+                                    "Gain: %.1f dB (Target: %.1f dB)".format(dbg.currentBassGainDb, dbg.targetBassGainDb),
+                                    style = mono, color = Color.White.copy(alpha = 0.85f)
+                                )
+                                Text(
+                                    if (dbg.targetBassGainDb == 0.0) "State: DROP / HIGH INTENSITY (0.0 dB)" else "State: VERSE ATTENUATION (-8.0 dB) [Min 5s]",
+                                    style = mono, color = if (dbg.targetBassGainDb == 0.0) Color.Green else Color.Yellow
+                                )
+                            }
+                            com.krish.jaatplayer.constants.JaatStyleMode.SPATIAL_8D -> {
+                                Text(
+                                    "360° Orbit Angle: ${dbg.orbitAngleDeg}°",
+                                    style = mono, color = Color.White.copy(alpha = 0.85f)
+                                )
+                            }
+                            com.krish.jaatplayer.constants.JaatStyleMode.FILTER_SWEEP -> {
+                                Text(
+                                    "Filter Cutoff Sweep: ${dbg.filterCutoffHz} Hz",
+                                    style = mono, color = Color.White.copy(alpha = 0.85f)
+                                )
+                            }
+                            com.krish.jaatplayer.constants.JaatStyleMode.MASHUP -> {
+                                Text(
+                                    "Rhythmic Beat Ducking Pulse Active",
+                                    style = mono, color = Color.White.copy(alpha = 0.85f)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -797,77 +866,28 @@ fun BottomSheetPlayer(
         mutableStateOf(false)
     }
 
+    var showEqualizerGlassCard by remember {
+        mutableStateOf(false)
+    }
+
     var sleepTimerValue by remember {
         mutableFloatStateOf(30f)
     }
-    if (showSleepTimerDialog) {
-        val menuGlassConfig = com.krish.jaatplayer.ui.component.LocalMenuGlassConfig.current
-        val useSleepTimerGlass = menuGlassConfig.isEnabledFor(com.krish.jaatplayer.ui.component.GlassMenu.SLEEP_TIMER) &&
-            com.krish.jaatplayer.ui.component.isGlassSupported()
-        val sleepTimerGlassEffectConfig = menuGlassConfig.toGlassEffectConfig(globalEnabled = useSleepTimerGlass)
-        AlertDialog(
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-            onDismissRequest = { showSleepTimerDialog = false },
-            containerColor = if (useSleepTimerGlass) Color.Transparent else AlertDialogDefaults.containerColor,
-            modifier = if (useSleepTimerGlass) {
-                Modifier
-                    .clip(RoundedCornerShape(28.dp))
-                    .liquidGlass(config = sleepTimerGlassEffectConfig, shape = RoundedCornerShape(28.dp))
-            } else Modifier,
-            icon = {
-                Icon(
-                    painter = painterResource(R.drawable.bedtime),
-                    contentDescription = null
-                )
-            },
-            title = { Text(stringResource(R.string.sleep_timer)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showSleepTimerDialog = false
-                        playerConnection.service.sleepTimer.start(sleepTimerValue.roundToInt())
-                    },
-                ) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showSleepTimerDialog = false },
-                ) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = pluralStringResource(
-                            R.plurals.minute,
-                            sleepTimerValue.roundToInt(),
-                            sleepTimerValue.roundToInt()
-                        ),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+    // The actual sleep timer overlay UI is rendered further down, inside the same
+    // CompositionLocalProvider(LocalAppBackdrop provides playerBackdrop) scope as the rest of
+    // this screen — see "Sleep timer overlay" near the end of this function. Unlike AlertDialog,
+    // that keeps it in the SAME Android window as the live content behind it, which is what makes
+    // the backdrop blur/position math correct (this is exactly how the mini player and bottom
+    // nav bar already achieve real, non-frozen glass) — and, because it stays inside the
+    // playerBackdrop scope, it correctly samples THIS Player screen's own live background,
+    // the same way the mini player/nav bar sample the Home screen's.
 
-                    Slider(
-                        value = sleepTimerValue,
-                        onValueChange = { sleepTimerValue = it },
-                        valueRange = 5f..120f,
-                        steps = (120 - 5) / 5 - 1,
-                    )
-
-                    OutlinedIconButton(
-                        onClick = {
-                            showSleepTimerDialog = false
-                            playerConnection.service.sleepTimer.start(-1)
-                        },
-                    ) {
-                        Text(stringResource(R.string.end_of_song))
-                    }
-                }
-            },
-        )
-    }
+    // Player-screen-local menu state for the "..." (Play) menu. Deliberately separate from
+    // LocalMenuState.current: that one is rendered by a single app-wide BottomSheetMenu in
+    // MainActivity, outside this screen's playerBackdrop scope, so anything shown through it
+    // would sample the Home screen's background instead of the Player screen's. This state is
+    // rendered further down as a plain PlayerGlassOverlay inside the playerBackdrop scope instead.
+    val playerMenuState = remember { com.krish.jaatplayer.ui.component.MenuState() }
 
     var showChoosePlaylistDialog by rememberSaveable {
         mutableStateOf(false)
@@ -961,6 +981,13 @@ fun BottomSheetPlayer(
     val backgroundAlpha = state.progress.coerceIn(0f, 1f)
 
     val playerBackdrop = com.krish.jaatplayer.ui.component.backdrop.backdrops.rememberLayerBackdrop()
+
+    // Every glass surface below (background, sleep timer, equalizer, Play menu) is inside this
+    // CompositionLocalProvider, so LocalAppBackdrop.current resolves to playerBackdrop for all of
+    // them: they sample THIS Player screen's own live background, the same way the Home screen's
+    // mini player/nav bar sample the Home screen's. That only holds as long as those surfaces stay
+    // plain same-window composables (see PlayerGlassOverlay.kt) — a Dialog()/AlertDialog()/
+    // ModalBottomSheet() opens a separate window and breaks the backdrop's per-window position math.
 
     androidx.compose.runtime.CompositionLocalProvider(
         com.krish.jaatplayer.ui.component.LocalAppBackdrop provides playerBackdrop
@@ -1576,10 +1603,10 @@ fun BottomSheetPlayer(
                                         }
                                     },
                                     onLongClick = {
-                                        val clip = ClipData.newPlainText(context.getString(R.string.copied_title), title)
+                                        val clip = ClipData.newPlainText(context.resources.getString(R.string.copied_title), title)
                                         clipboardManager.setPrimaryClip(clip)
                                         Toast
-                                            .makeText(context, context.getString(R.string.copied_title), Toast.LENGTH_SHORT)
+                                            .makeText(context, context.resources.getString(R.string.copied_title), Toast.LENGTH_SHORT)
                                             .show()
                                     }
                                 )
@@ -1682,14 +1709,14 @@ fun BottomSheetPlayer(
                                             onLongClick = {
                                                 val clip =
                                                     ClipData.newPlainText(
-                                                        context.getString(R.string.copied_artist),
+                                                        context.resources.getString(R.string.copied_artist),
                                                         annotatedString
                                                     )
                                                 clipboardManager.setPrimaryClip(clip)
                                                 Toast
                                                     .makeText(
                                                         context,
-                                                        context.getString(R.string.copied_artist),
+                                                        context.resources.getString(R.string.copied_artist),
                                                         Toast.LENGTH_SHORT
                                                     )
                                                     .show()
@@ -1885,7 +1912,7 @@ fun BottomSheetPlayer(
                                 com.krish.jaatplayer.ui.component.isGlassSupported()
 
                             fun openOldPlayerMenu() {
-                                menuState.show {
+                                playerMenuState.show(glassMenu = com.krish.jaatplayer.ui.component.GlassMenu.PLAYER) {
                                     OldPlayerMenu(
                                         mediaMetadata = mediaMetadata,
                                         navController = navController,
@@ -1897,7 +1924,8 @@ fun BottomSheetPlayer(
                                                 }
                                             }
                                         },
-                                        onDismiss = menuState::dismiss
+                                        onDismiss = playerMenuState::dismiss,
+                                        onOpenEqualizerGlass = { showEqualizerGlassCard = true }
                                     )
                                 }
                             }
@@ -1928,6 +1956,7 @@ fun BottomSheetPlayer(
                                     navController = navController,
                                     onDismiss = { showPlayerDock = false },
                                     onMore = { openOldPlayerMenu() },
+                                    onOpenEqualizerGlass = { showEqualizerGlassCard = true },
                                 )
                             }
                         }
@@ -2363,6 +2392,7 @@ fun BottomSheetPlayer(
             }
 
             automixDebugOverlay()
+            jaatStylesDebugOverlay()
 
             Spacer(Modifier.height(if (useNewPlayerDesign) 24.dp else 12.dp))
 
@@ -3022,6 +3052,196 @@ fun BottomSheetPlayer(
             },
             )
         }
+
+        // Sleep timer / equalizer / Play menu overlays — deliberately NOT an AlertDialog,
+        // Dialog or ModalBottomSheet. They're plain sibling composables inside this same
+        // CompositionLocalProvider(LocalAppBackdrop provides playerBackdrop) block, so they
+        // share the exact same Android window as BottomSheet/Queue above and correctly
+        // sample THIS Player screen's own live background. That's what makes the backdrop
+        // blur genuinely live and correctly positioned instead of frozen/misaligned — a
+        // Dialog/AlertDialog/ModalBottomSheet opens a *separate* window, and this app's
+        // backdrop blur positions itself using per-window coordinates, so it can't
+        // correctly sample content from a different window. See PlayerGlassOverlay.kt.
+        run {
+            val menuGlassConfig = com.krish.jaatplayer.ui.component.LocalMenuGlassConfig.current
+            val useSleepTimerGlass = menuGlassConfig.isEnabledFor(com.krish.jaatplayer.ui.component.GlassMenu.SLEEP_TIMER) &&
+                com.krish.jaatplayer.ui.component.isGlassSupported()
+            val sleepTimerGlassEffectConfig = menuGlassConfig.toGlassEffectConfig(globalEnabled = useSleepTimerGlass)
+            val dialogShape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+
+            var isOverlayActive by remember { mutableStateOf(showSleepTimerDialog) }
+            LaunchedEffect(showSleepTimerDialog) {
+                if (showSleepTimerDialog) isOverlayActive = true
+            }
+
+            if (isOverlayActive) {
+                androidx.activity.compose.BackHandler(enabled = showSleepTimerDialog) {
+                    showSleepTimerDialog = false
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { showSleepTimerDialog = false }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showSleepTimerDialog,
+                        enter = scaleIn(initialScale = 0.9f, animationSpec = tween(220)) + fadeIn(animationSpec = tween(220)),
+                        exit = scaleOut(targetScale = 0.9f, animationSpec = tween(180)) + fadeOut(animationSpec = tween(180)),
+                    ) {
+                        DisposableEffect(Unit) {
+                            onDispose { isOverlayActive = false }
+                        }
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .padding(24.dp)
+                                .widthIn(max = 320.dp)
+                                .clip(dialogShape)
+                                .then(
+                                    if (useSleepTimerGlass) {
+                                        Modifier.liquidGlass(config = sleepTimerGlassEffectConfig, shape = dialogShape)
+                                    } else {
+                                        Modifier
+                                            .background(AlertDialogDefaults.containerColor)
+                                    }
+                                )
+                                .clickable(enabled = false) {} // absorb clicks so tapping the card doesn't dismiss
+                                .padding(24.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.bedtime),
+                                contentDescription = null
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(stringResource(R.string.sleep_timer), style = MaterialTheme.typography.headlineSmall)
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                text = pluralStringResource(
+                                    R.plurals.minute,
+                                    sleepTimerValue.roundToInt(),
+                                    sleepTimerValue.roundToInt()
+                                ),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Slider(
+                                value = sleepTimerValue,
+                                onValueChange = { sleepTimerValue = it },
+                                valueRange = 5f..120f,
+                                steps = (120 - 5) / 5 - 1,
+                            )
+                            OutlinedIconButton(
+                                onClick = {
+                                    showSleepTimerDialog = false
+                                    playerConnection.service.sleepTimer.start(-1)
+                                },
+                            ) {
+                                Text(stringResource(R.string.end_of_song))
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
+                                TextButton(onClick = { showSleepTimerDialog = false }) {
+                                    Text(stringResource(android.R.string.cancel))
+                                }
+                                TextButton(
+                                    onClick = {
+                                        showSleepTimerDialog = false
+                                        playerConnection.service.sleepTimer.start(sleepTimerValue.roundToInt())
+                                    },
+                                ) {
+                                    Text(stringResource(android.R.string.ok))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            var isEqualizerGlassActive by remember { mutableStateOf(showEqualizerGlassCard) }
+            LaunchedEffect(showEqualizerGlassCard) {
+                if (showEqualizerGlassCard) isEqualizerGlassActive = true
+            }
+
+            if (isEqualizerGlassActive) {
+                BackHandler(enabled = showEqualizerGlassCard) {
+                    showEqualizerGlassCard = false
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { showEqualizerGlassCard = false }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AnimatedVisibility(
+                        visible = showEqualizerGlassCard,
+                        enter = scaleIn(initialScale = 0.88f, animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessLow)) + fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)),
+                        exit = scaleOut(targetScale = 0.88f, animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) + fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)),
+                    ) {
+                        DisposableEffect(Unit) {
+                            onDispose { isEqualizerGlassActive = false }
+                        }
+
+                        EqualizerGlassCard(
+                            onOpenAdvancedEq = {
+                                showEqualizerGlassCard = false
+                                navController.navigate("settings/equalizer")
+                            },
+                            modifier = Modifier.clickable(enabled = false) {}
+                        )
+                    }
+                }
+            }
+
+            // Play menu ("...") overlay — see PlayerGlassOverlay.kt for why this can't be a
+            // Dialog()/ModalBottomSheet(): those open a separate window, which breaks the
+            // backdrop blur's per-window position math. This stays inside the playerBackdrop
+            // scope above, so its glass genuinely samples this Player screen's own live
+            // background, same as the sleep timer and equalizer overlays above.
+            val playMenuGlassConfig = com.krish.jaatplayer.ui.component.LocalMenuGlassConfig.current
+            val playMenuGlassMenu = playerMenuState.glassMenu
+            val usePlayGlass = playMenuGlassMenu != null &&
+                playMenuGlassConfig.isEnabledFor(playMenuGlassMenu) &&
+                com.krish.jaatplayer.ui.component.isGlassSupported()
+            val playGlassEffectConfig = playMenuGlassConfig.toGlassEffectConfig(globalEnabled = usePlayGlass)
+            val playSheetShape = RoundedCornerShape(28.dp, 28.dp, 0.dp, 0.dp)
+
+            com.krish.jaatplayer.ui.component.PlayerGlassOverlay(
+                visible = playerMenuState.isVisible,
+                onDismissRequest = playerMenuState::dismiss,
+                alignment = Alignment.BottomCenter,
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.85f).dp)
+                        .clip(playSheetShape)
+                        .then(
+                            if (usePlayGlass) {
+                                Modifier.liquidGlass(config = playGlassEffectConfig, shape = playSheetShape)
+                            } else {
+                                Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
+                            }
+                        )
+                        .padding(horizontal = 20.dp)
+                ) {
+                    playerMenuState.content(this)
+                }
+            }
+        }
     }
     }
 }
@@ -3109,7 +3329,8 @@ fun MoreActionsButton(
     navController: NavController,
     state: BottomSheetState,
     textButtonColor: Color,
-    iconButtonColor: Color
+    iconButtonColor: Color,
+    onOpenEqualizerGlass: (() -> Unit)? = null,
 ) {
     val menuState = LocalMenuState.current
     val bottomSheetPageState = LocalBottomSheetPageState.current
@@ -3131,7 +3352,8 @@ fun MoreActionsButton(
                         }
                     }
                 },
-                onDismiss = menuState::dismiss
+                onDismiss = menuState::dismiss,
+                onOpenEqualizerGlass = onOpenEqualizerGlass
             )
         }
     }
@@ -3159,6 +3381,7 @@ fun MoreActionsButton(
             navController = navController,
             onDismiss = { showDock = false },
             onMore = { openMaterialMenu() },
+            onOpenEqualizerGlass = onOpenEqualizerGlass,
         )
     }
 }
@@ -3170,6 +3393,7 @@ private fun PlayerMoreMenuButton(
     state: BottomSheetState,
     textButtonColor: Color,
     iconButtonColor: Color,
+    onOpenEqualizerGlass: (() -> Unit)? = null,
 ) {
     val menuState = LocalMenuState.current
     val bottomSheetPageState = LocalBottomSheetPageState.current
@@ -3195,6 +3419,7 @@ private fun PlayerMoreMenuButton(
                             }
                         },
                         onDismiss = menuState::dismiss,
+                        onOpenEqualizerGlass = onOpenEqualizerGlass
                     )
                 }
             },

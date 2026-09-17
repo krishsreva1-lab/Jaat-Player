@@ -44,6 +44,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.krish.jaatplayer.R
@@ -54,21 +57,34 @@ import kotlinx.coroutines.delay
 fun DefaultDialog(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    glassEffectConfig: GlassEffectConfig? = null,
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     buttons: (@Composable RowScope.() -> Unit)? = null,
     horizontalAlignment: Alignment.Horizontal = Alignment.CenterHorizontally,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val useGlass = glassEffectConfig != null && glassEffectConfig.globalEnabled && isGlassSupported()
+    val dialogShape = AlertDialogDefaults.shape as? androidx.compose.foundation.shape.CornerBasedShape ?: androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier.padding(24.dp),
-            shape = AlertDialogDefaults.shape,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation
+            modifier = Modifier
+                .padding(24.dp)
+                .widthIn(max = 320.dp)
+                .let { mod ->
+                    if (useGlass) {
+                        mod.clip(dialogShape)
+                            .liquidGlass(config = glassEffectConfig!!, shape = dialogShape)
+                    } else {
+                        mod
+                    }
+                },
+            shape = dialogShape,
+            color = if (useGlass) Color.Transparent else AlertDialogDefaults.containerColor,
+            tonalElevation = if (useGlass) 0.dp else AlertDialogDefaults.TonalElevation
         ) {
             Column(
                 horizontalAlignment = horizontalAlignment,
@@ -134,10 +150,12 @@ fun ActionPromptDialog(
     onConfirm: () -> Unit,
     onReset: (() -> Unit)? = null,
     onCancel: (() -> Unit)? = null,
+    glassEffectConfig: GlassEffectConfig? = null,
     content: @Composable ColumnScope.() -> Unit = {}
 ) {
     DefaultDialog(
         onDismiss = onDismiss,
+        glassEffectConfig = glassEffectConfig,
         title = if (titleBar != null) {
             { Row { titleBar() } }
         } else if (title != null) {

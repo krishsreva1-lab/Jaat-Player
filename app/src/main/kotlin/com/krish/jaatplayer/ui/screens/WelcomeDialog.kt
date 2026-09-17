@@ -31,6 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.krish.jaatplayer.BuildConfig
@@ -41,6 +45,7 @@ fun WelcomeDialog(
     onDismissRequest: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -66,12 +71,61 @@ fun WelcomeDialog(
                 // Main Header
                 WelcomeAppCard()
 
-                WelcomeSectionCard(title = "Follow Developer") {
+                WelcomeSectionCard(title = "Developer") {
                     WelcomeActionRow(
                         icon = painterResource(R.drawable.ic_instagram_new),
                         title = "Instagram",
                         subtitle = "@krishsreva444",
                         onClick = { uriHandler.openUri("https://instagram.com/krishsreva444") }
+                    )
+                    WelcomeDivider()
+                    WelcomeActionRow(
+                        icon = painterResource(R.drawable.website),
+                        title = "Website",
+                        subtitle = "jaatplayerr.netlify.app",
+                        onClick = { uriHandler.openUri("https://jaatplayerr.netlify.app/") }
+                    )
+                    WelcomeDivider()
+                    WelcomeActionRow(
+                        icon = painterResource(R.drawable.person),
+                        title = "About Developer",
+                        subtitle = "Know more about me",
+                        onClick = { uriHandler.openUri("https://jaatplayerr.netlify.app/") }
+                    )
+                }
+
+                WelcomeSectionCard(title = "Community") {
+                    WelcomeActionRow(
+                        icon = painterResource(R.drawable.ic_telegram_new),
+                        title = "Telegram Channel",
+                        subtitle = "t.me/jaatplayerr",
+                        onClick = { uriHandler.openUri("https://t.me/jaatplayerr") }
+                    )
+                }
+
+                WelcomeSectionCard(title = "Support & Donate") {
+                    WelcomeActionRow(
+                        icon = painterResource(R.drawable.currency_rupee_upi),
+                        title = "Donate via UPI",
+                        subtitle = "GPay / PhonePe / Paytm / BHIM",
+                        onClick = {
+                            val upiUri = Uri.parse("upi://pay?pa=9887624399@fam&pn=Jaat%20Player&tn=Support%20Jaat%20Player&cu=INR")
+                            val intent = Intent(Intent.ACTION_VIEW, upiUri)
+                            try {
+                                context.startActivity(Intent.createChooser(intent, "Pay with UPI"))
+                            } catch (_: Exception) {
+                                Toast.makeText(context, "No UPI app found on device", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+                }
+
+                WelcomeSectionCard(title = "App") {
+                    WelcomeActionRow(
+                        icon = painterResource(R.drawable.github),
+                        title = "GitHub",
+                        subtitle = "krishsreva1-lab/Jaat-Player",
+                        onClick = { uriHandler.openUri("https://github.com/krishsreva1-lab/Jaat-Player") }
                     )
                 }
 

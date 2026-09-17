@@ -119,18 +119,6 @@ fun GlassEffectSettings(
         Color.White
     }
     val textColor = if (textColorInt == 0) adaptiveTextColor else Color(textColorInt)
-    val (playerEnabled, onPlayerEnabledChange) = rememberPreference(
-        LiquidGlassPlayerEnabledKey, defaultValue = true
-    )
-    val (miniPlayerEnabled, onMiniPlayerEnabledChange) = rememberPreference(
-        LiquidGlassMiniPlayerEnabledKey, defaultValue = true
-    )
-    val (navBarEnabled, onNavBarEnabledChange) = rememberPreference(
-        LiquidGlassNavBarEnabledKey, defaultValue = true
-    )
-    val (menuEnabled, onMenuEnabledChange) = rememberPreference(
-        LiquidGlassMenuEnabledKey, defaultValue = true
-    )
     val (adoptThemeColor, onAdoptThemeColorChange) = rememberPreference(
         LiquidGlassAdoptThemeColorKey, defaultValue = true
     )
@@ -345,94 +333,7 @@ fun GlassEffectSettings(
             )
         )
 
-        Spacer(modifier = Modifier.height(27.dp))
 
-        Material3SettingsGroup(
-            title = stringResource(R.string.liquid_glass_per_component),
-            items = listOf(
-                Material3SettingsItem(
-                    icon = painterResource(R.drawable.music_note),
-                    title = { Text(stringResource(R.string.liquid_glass_player)) },
-                    trailingContent = {
-                        Switch(
-                            checked = playerEnabled,
-                            onCheckedChange = onPlayerEnabledChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (playerEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
-                        )
-                    },
-                    onClick = { onPlayerEnabledChange(!playerEnabled) }
-                ),
-                Material3SettingsItem(
-                    icon = painterResource(R.drawable.music_note),
-                    title = { Text(stringResource(R.string.liquid_glass_mini_player)) },
-                    trailingContent = {
-                        Switch(
-                            checked = miniPlayerEnabled,
-                            onCheckedChange = onMiniPlayerEnabledChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (miniPlayerEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
-                        )
-                    },
-                    onClick = { onMiniPlayerEnabledChange(!miniPlayerEnabled) }
-                ),
-                Material3SettingsItem(
-                    icon = painterResource(R.drawable.nav_bar),
-                    title = { Text(stringResource(R.string.liquid_glass_nav_bar)) },
-                    trailingContent = {
-                        Switch(
-                            checked = navBarEnabled,
-                            onCheckedChange = onNavBarEnabledChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (navBarEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
-                        )
-                    },
-                    onClick = { onNavBarEnabledChange(!navBarEnabled) }
-                ),
-                Material3SettingsItem(
-                    icon = painterResource(R.drawable.tune),
-                    title = { Text(stringResource(R.string.liquid_glass_menus)) },
-                    description = { Text(stringResource(R.string.liquid_glass_menus_desc)) },
-                    trailingContent = {
-                        Switch(
-                            checked = menuEnabled,
-                            onCheckedChange = onMenuEnabledChange,
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (menuEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
-                        )
-                    },
-                    onClick = { onMenuEnabledChange(!menuEnabled) }
-                ),
-            )
-        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -443,6 +344,7 @@ fun GlassEffectSettings(
         val (speakerMenuEnabled, onSpeakerMenuEnabledChange) = rememberPreference(LiquidGlassSpeakerMenuEnabledKey, defaultValue = false)
         val (speedMenuEnabled, onSpeedMenuEnabledChange) = rememberPreference(LiquidGlassSpeedMenuEnabledKey, defaultValue = false)
         val (sleepTimerMenuEnabled, onSleepTimerMenuEnabledChange) = rememberPreference(LiquidGlassSleepTimerMenuEnabledKey, defaultValue = false)
+        val (equalizerMenuEnabled, onEqualizerMenuEnabledChange) = rememberPreference(LiquidGlassEqualizerMenuEnabledKey, defaultValue = true)
         val (menuBlur, onMenuBlurChange) = rememberPreference(LiquidGlassMenuBlurRadiusKey, defaultValue = 12f)
         val (menuVibrancy, onMenuVibrancyChange) = rememberPreference(LiquidGlassMenuVibrancyKey, defaultValue = 1f)
         val (menuLensHeight, onMenuLensHeightChange) = rememberPreference(LiquidGlassMenuLensHeightKey, defaultValue = 0.5f)
@@ -552,6 +454,11 @@ fun GlassEffectSettings(
                     title = { Text(stringResource(R.string.liquid_glass_sleep_timer_menu)) },
                     trailingContent = { Switch(checked = sleepTimerMenuEnabled, onCheckedChange = onSleepTimerMenuEnabledChange) },
                     onClick = { onSleepTimerMenuEnabledChange(!sleepTimerMenuEnabled) }
+                ),
+                Material3SettingsItem(
+                    title = { Text(stringResource(R.string.equalizer) + " Menu") },
+                    trailingContent = { Switch(checked = equalizerMenuEnabled, onCheckedChange = onEqualizerMenuEnabledChange) },
+                    onClick = { onEqualizerMenuEnabledChange(!equalizerMenuEnabled) }
                 ),
             )
         )

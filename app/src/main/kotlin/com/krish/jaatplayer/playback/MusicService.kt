@@ -87,6 +87,12 @@ import com.krish.jaatplayer.constants.CrossfadeDurationKey
 import com.krish.jaatplayer.constants.CrossfadeEnabledKey
 import com.krish.jaatplayer.constants.CrossfadeGaplessKey
 import com.krish.jaatplayer.constants.DisableLoadMoreWhenRepeatAllKey
+import com.krish.jaatplayer.constants.JaatStylesEnabledKey
+import com.krish.jaatplayer.constants.JaatStylesModeKey
+import com.krish.jaatplayer.constants.JaatStylesIntensityKey
+import com.krish.jaatplayer.constants.JaatStylesBassSubModeKey
+import com.krish.jaatplayer.constants.JaatStyleMode
+import com.krish.jaatplayer.constants.JaatBassSubMode
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -241,6 +247,9 @@ class MusicService :
 
     @Inject
     lateinit var equalizerService: EqualizerService
+
+    @Inject
+    lateinit var reverb3DService: com.krish.jaatplayer.eq.Reverb3DService
 
     @Inject
     lateinit var eqProfileRepository: EQProfileRepository
@@ -443,6 +452,8 @@ class MusicService :
 
     private val playerSilenceProcessors = HashMap<Player, SilenceDetectorAudioProcessor>()
     private val playerDuckProcessors = HashMap<Player, AutomixDuckAudioProcessor>()
+    val jaatStylesProcessor = com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor()
+    val jaatStylesDebugInfo = MutableStateFlow<com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor.JaatStylesDebugInfo?>(null)
 
 
     private val instantSilenceSkipEnabled = MutableStateFlow(false)
@@ -896,6 +907,7 @@ class MusicService :
             format to normalizeAudio
         }.collectLatest(scope) { (format, normalizeAudio) -> setupLoudnessEnhancer()}
 
+
         combine(
             dataStore.data.map { it[AudioOffload] ?: false },
             dataStore.data.map { it[CrossfadeEnabledKey] ?: false }
@@ -985,6 +997,34 @@ class MusicService :
             .map { it[PreloadLyricsEnabledKey] ?: true }
             .distinctUntilChanged()
             .collect(scope) { cachedPreloadLyrics = it }
+
+        combine(
+            dataStore.data.map { it[JaatStylesEnabledKey] ?: false },
+            dataStore.data.map { it[JaatStylesModeKey] ?: "BASS_DROP" },
+            dataStore.data.map { it[JaatStylesIntensityKey] ?: 0.7f },
+            dataStore.data.map { it[JaatStylesBassSubModeKey] ?: "BEAT_ADAPTIVE" }
+        ) { enabled, modeStr, intensity, subModeStr ->
+            data class Config(val enabled: Boolean, val modeStr: String, val intensity: Float, val subModeStr: String)
+            Config(enabled, modeStr, intensity, subModeStr)
+        }
+            .distinctUntilChanged()
+            .collect(scope) { config ->
+                jaatStylesProcessor.isStyleEnabled = config.enabled
+                jaatStylesProcessor.mode = runCatching { JaatStyleMode.valueOf(config.modeStr) }.getOrDefault(JaatStyleMode.BASS_DROP)
+                jaatStylesProcessor.intensity = config.intensity
+                jaatStylesProcessor.bassSubMode = runCatching { JaatBassSubMode.valueOf(config.subModeStr) }.getOrDefault(JaatBassSubMode.BEAT_ADAPTIVE)
+            }
+
+        scope.launch {
+            while (isActive) {
+                if (jaatStylesProcessor.isStyleEnabled) {
+                    jaatStylesDebugInfo.value = jaatStylesProcessor.getDebugInfo()
+                } else {
+                    jaatStylesDebugInfo.value = null
+                }
+                delay(200)
+            }
+        }
 
 
         if (dataStore.get(PersistentQueueKey, true)) {
@@ -1096,6 +1136,9 @@ class MusicService :
         val eqProcessor = CustomEqualizerAudioProcessor()
         equalizerService.addAudioProcessor(eqProcessor)
 
+        val reverbProcessor = com.krish.jaatplayer.eq.audio.Reverb3DAudioProcessor()
+        reverb3DService.addAudioProcessor(reverbProcessor)
+
         val duckProcessor = AutomixDuckAudioProcessor()
 
         val silenceProcessor = SilenceDetectorAudioProcessor { handleLongSilenceDetected() }
@@ -1109,7 +1152,7 @@ class MusicService :
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(createMediaSourceFactory())
-            .setRenderersFactory(createRenderersFactory(eqProcessor, silenceProcessor, duckProcessor))
+            .setRenderersFactory(createRenderersFactory(eqProcessor, reverbProcessor, silenceProcessor, duckProcessor, jaatStylesProcessor))
             .setLoadControl(
                 DefaultLoadControl.Builder()
                     .setBufferDurationsMs(50_000, 50_000, 750, 2_000)
@@ -1445,7 +1488,7 @@ class MusicService :
         }
         if (!isOfflinePlayback && !database.hasRelatedSongs(mediaId)) {
             suspend fun fetchRelated(): Pair<BrowseEndpoint, com.music.innertube.pages.RelatedPage>? {
-                val relatedEndpoint = YouTube.next(WatchEndpoint(videoId = mediaId)).getOrNull()?.relatedEndpoint
+                val relatedEndpoint = YouTube.next(WatchEndpoint(videoId = mediaId, playlistId = "RDAMVM$mediaId")).getOrNull()?.relatedEndpoint
                     ?: return null
                 val relatedPage = YouTube.related(relatedEndpoint).getOrNull() ?: return null
                 return relatedEndpoint to relatedPage
@@ -1565,7 +1608,8 @@ class MusicService :
             
             val radioQueue = YouTubeQueue(
                 endpoint = WatchEndpoint(
-                    videoId = currentMediaId
+                    videoId = currentMediaId,
+                    playlistId = "RDAMVM$currentMediaId"
                 )
             )
 
@@ -1604,7 +1648,7 @@ class MusicService :
                 
                 try {
                     val nextResult = withContext(Dispatchers.IO) {
-                        YouTube.next(WatchEndpoint(videoId = currentMediaId)).getOrNull()
+                        YouTube.next(WatchEndpoint(videoId = currentMediaId, playlistId = "RDAMVM$currentMediaId")).getOrNull()
                     }
                     nextResult?.relatedEndpoint?.let { relatedEndpoint ->
                         val relatedPage = withContext(Dispatchers.IO) {
@@ -1676,7 +1720,8 @@ class MusicService :
                             if (currentSong != null) {
                                 
                                 YouTube.next(WatchEndpoint(
-                                    videoId = currentSong.id
+                                    videoId = currentSong.id,
+                                    playlistId = "RDAMVM${currentSong.id}"
                                 )).onSuccess { radioResult ->
                                     val filteredItems = radioResult.items
                                         .filter { it.id != currentSong.id }
@@ -1686,7 +1731,7 @@ class MusicService :
                                     }
                                 }.onFailure {
                                     
-                                    YouTube.next(WatchEndpoint(videoId = currentSong.id)).getOrNull()?.relatedEndpoint?.let { relatedEndpoint ->
+                                    YouTube.next(WatchEndpoint(videoId = currentSong.id, playlistId = "RDAMVM${currentSong.id}")).getOrNull()?.relatedEndpoint?.let { relatedEndpoint ->
                                         YouTube.related(relatedEndpoint).onSuccess { relatedPage ->
                                             val relatedItems = relatedPage.songs
                                                 .filter { it.id != currentSong.id }
@@ -3158,8 +3203,10 @@ class MusicService :
 
     private fun createRenderersFactory(
         eqProcessor: CustomEqualizerAudioProcessor,
+        reverbProcessor: com.krish.jaatplayer.eq.audio.Reverb3DAudioProcessor,
         silenceProcessor: SilenceDetectorAudioProcessor,
         duckProcessor: AutomixDuckAudioProcessor,
+        jaatStylesProcessor: com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor,
     ) =
         object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(
@@ -3175,6 +3222,8 @@ class MusicService :
 
                         arrayOf(
                             eqProcessor,
+                            reverbProcessor,
+                            jaatStylesProcessor,
                             duckProcessor,
                             silenceProcessor,
                         ),

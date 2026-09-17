@@ -35,6 +35,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.shape.CircleShape
@@ -52,6 +54,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
@@ -353,7 +357,8 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp)
+                .padding(vertical = 16.dp)
+                .verticalScroll(rememberScrollState())
                 .animateContentSize()
         ) {
             when {
@@ -695,9 +700,14 @@ fun AudioDeviceBottomSheet(onDismiss: () -> Unit, modifier: Modifier = Modifier)
     }
 
     if (useSpeakerGlass) {
-        androidx.compose.ui.window.Dialog(
+        // PlayerGlassOverlay instead of Dialog() — a Dialog opens a separate Android window,
+        // and this app's backdrop blur positions itself using per-window coordinates, so a
+        // glass surface in a separate window samples a misaligned/frozen crop instead of the
+        // live background behind it. See ui/component/PlayerGlassOverlay.kt.
+        com.krish.jaatplayer.ui.component.PlayerGlassOverlay(
+            visible = true,
             onDismissRequest = onDismiss,
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            alignment = androidx.compose.ui.Alignment.Center,
         ) {
             androidx.compose.material3.Card(
                 modifier = Modifier

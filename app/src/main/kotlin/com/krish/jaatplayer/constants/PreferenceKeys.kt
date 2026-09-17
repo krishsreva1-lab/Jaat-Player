@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import com.krish.jaatplayer.R
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
@@ -834,3 +835,34 @@ val LiquidGlassMenuLensHeightKey = floatPreferencesKey("liquidGlassMenuLensHeigh
 val LiquidGlassMenuLensAmountKey = floatPreferencesKey("liquidGlassMenuLensAmount")
 val LiquidGlassAdoptThemeColorKey = booleanPreferencesKey("liquidGlassAdoptThemeColor")
 val UseFloatingNavBarKey = booleanPreferencesKey("useFloatingNavBar")
+
+val LiquidGlassEqCardEnabledKey = booleanPreferencesKey("liquidGlassEqCardEnabled")
+val JaatStylesEnabledKey = booleanPreferencesKey("jaatStylesEnabled")
+val JaatStylesModeKey = stringPreferencesKey("jaatStylesMode")
+val JaatStylesIntensityKey = floatPreferencesKey("jaatStylesIntensity")
+val JaatStylesBassSubModeKey = stringPreferencesKey("jaatStylesBassSubMode")
+val JaatStylesDebugOverlayKey = booleanPreferencesKey("jaatStylesDebugOverlay")
+
+enum class JaatStyleMode {
+    BASS_DROP, MASHUP, SPATIAL_8D, FILTER_SWEEP
+}
+
+enum class JaatBassSubMode {
+    BEAT_ADAPTIVE, RANDOM_TIMER
+}
+
+val LiquidGlassEqualizerMenuEnabledKey = booleanPreferencesKey("liquidGlassEqualizerMenuEnabled")
+val SelectedProfileAvatarKey = intPreferencesKey("selectedProfileAvatar")
+val NextDonationPromptTimeKey = longPreferencesKey("nextDonationPromptTime")
+
+fun getProfileAvatarDrawableRes(avatarIndex: Int): Int {
+    return when (avatarIndex) {
+        1 -> R.drawable.profile_avatar_1
+        2 -> R.drawable.profile_avatar_2
+        3 -> R.drawable.profile_avatar_3
+        4 -> R.drawable.profile_avatar_4
+        5 -> R.drawable.profile_avatar_5
+        6 -> R.drawable.profile_avatar_6
+        else -> R.drawable.profile_avatar_1
+    }
+}

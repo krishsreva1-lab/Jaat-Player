@@ -88,7 +88,9 @@ import com.krish.jaatplayer.listentogether.ListenTogetherEvent
 import com.krish.jaatplayer.models.MediaMetadata
 import com.krish.jaatplayer.playback.ExoDownloadService
 import com.krish.jaatplayer.ui.component.BottomSheetState
+import com.krish.jaatplayer.ui.component.GlassMenu
 import com.krish.jaatplayer.ui.component.ListDialog
+import com.krish.jaatplayer.ui.component.LocalMenuGlassConfig
 import com.krish.jaatplayer.ui.component.Material3MenuGroup
 import com.krish.jaatplayer.ui.component.Material3MenuItemData
 import com.krish.jaatplayer.ui.component.NewAction
@@ -110,6 +112,7 @@ fun PlayerMenu(
     isQueueTrigger: Boolean? = false,
     onShowDetailsDialog: () -> Unit,
     onDismiss: () -> Unit,
+    onOpenEqualizerGlass: (() -> Unit)? = null,
 ) {
     mediaMetadata ?: return
     val context = LocalContext.current
@@ -154,6 +157,7 @@ fun PlayerMenu(
     
     val librarySong by database.song(mediaMetadata.id).collectAsState(initial = null)
     val coroutineScope = rememberCoroutineScope()
+    val menuGlassConfig = LocalMenuGlassConfig.current
 
     val download by LocalDownloadUtil.current.getDownload(mediaMetadata.id)
         .collectAsState(initial = null)
@@ -747,7 +751,15 @@ fun PlayerMenu(
                                     )
                                 },
                                 onClick = {
-                                    navController.navigate("equalizer")
+                                    if (menuGlassConfig.isEnabledFor(GlassMenu.EQUALIZER)) {
+                                        if (onOpenEqualizerGlass != null) {
+                                            onOpenEqualizerGlass()
+                                        } else {
+                                            navController.navigate("equalizer_glass")
+                                        }
+                                    } else {
+                                        navController.navigate("settings/equalizer")
+                                    }
                                     onDismiss()
                                 }
                             )
@@ -796,15 +808,65 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
         com.krish.jaatplayer.ui.component.isGlassSupported()
     val speedGlassEffectConfig = menuGlassConfig.toGlassEffectConfig(globalEnabled = useSpeedGlass)
 
+    if (useSpeedGlass) {
+        // PlayerGlassDialog instead of AlertDialog — AlertDialog opens a real Dialog(), a
+        // separate Android window, and this app's backdrop blur positions itself using
+        // per-window coordinates, so a glass surface in a separate window samples a
+        // misaligned/frozen crop instead of the live background behind it. See
+        // ui/component/PlayerGlassOverlay.kt.
+        com.krish.jaatplayer.ui.component.PlayerGlassDialog(
+            visible = true,
+            onDismissRequest = onDismiss,
+            glassEffectConfig = speedGlassEffectConfig,
+            title = {
+                Text(stringResource(R.string.tempo_and_pitch))
+            },
+            buttons = {
+                TextButton(
+                    onClick = {
+                        tempo = 1f
+                        transposeValue = 0
+                        updatePlaybackParameters()
+                    },
+                ) {
+                    Text(stringResource(R.string.reset))
+                }
+                TextButton(
+                    onClick = onDismiss,
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        ) {
+            if (!isInRoom) {
+                ValueAdjuster(
+                    icon = R.drawable.speed,
+                    currentValue = tempo,
+                    values = (0..35).map { round((0.25f + it * 0.05f) * 100) / 100 },
+                    onValueUpdate = {
+                        tempo = it
+                        updatePlaybackParameters()
+                    },
+                    valueText = { "x$it" },
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+            }
+            ValueAdjuster(
+                icon = R.drawable.discover_tune,
+                currentValue = transposeValue,
+                values = (-12..12).toList(),
+                onValueUpdate = {
+                    transposeValue = it
+                    updatePlaybackParameters()
+                },
+                valueText = { "${if (it > 0) "+" else ""}$it" },
+            )
+        }
+        return
+    }
+
     AlertDialog(
-        properties = DialogProperties(usePlatformDefaultWidth = false),
         onDismissRequest = onDismiss,
-        containerColor = if (useSpeedGlass) androidx.compose.ui.graphics.Color.Transparent else androidx.compose.material3.AlertDialogDefaults.containerColor,
-        modifier = if (useSpeedGlass) {
-            Modifier
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(28.dp))
-                .liquidGlass(config = speedGlassEffectConfig, shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp))
-        } else Modifier,
         title = {
             Text(stringResource(R.string.tempo_and_pitch))
         },

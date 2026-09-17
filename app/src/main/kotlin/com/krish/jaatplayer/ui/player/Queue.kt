@@ -37,7 +37,10 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
@@ -631,71 +634,6 @@ fun Queue(
                         }
                     }
                 }
-            }
-            if (showAudioDeviceBottomSheet) {
-                AudioDeviceBottomSheet(onDismiss = { showAudioDeviceBottomSheet = false })
-            }
-
-            if (showSleepTimerDialog) {
-                ActionPromptDialog(
-                    titleBar = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = stringResource(R.string.sleep_timer),
-                                overflow = TextOverflow.Ellipsis,
-                                maxLines = 1,
-                                style = MaterialTheme.typography.headlineSmall,
-                            )
-                        }
-                    },
-                    onDismiss = { showSleepTimerDialog = false },
-                    onConfirm = {
-                        showSleepTimerDialog = false
-                        playerConnection.service.sleepTimer.start(sleepTimerValue.roundToInt())
-                    },
-                    onCancel = {
-                        showSleepTimerDialog = false
-                    },
-                    onReset = {
-                        sleepTimerValue = 30f 
-                    },
-                    content = {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = pluralStringResource(
-                                    R.plurals.minute,
-                                    sleepTimerValue.roundToInt(),
-                                    sleepTimerValue.roundToInt()
-                                ),
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-
-                            Spacer(Modifier.height(16.dp))
-
-                            Slider(
-                                value = sleepTimerValue,
-                                onValueChange = { sleepTimerValue = it },
-                                valueRange = 5f..120f,
-                                steps = (120 - 5) / 5 - 1,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(Modifier.height(8.dp))
-
-                            OutlinedButton(
-                                onClick = {
-                                    showSleepTimerDialog = false
-                                    playerConnection.service.sleepTimer.start(-1)
-                                }
-                            ) {
-                                Text(stringResource(R.string.end_of_song))
-                            }
-                        }
-                    }
-                )
             }
         },
     ) {
@@ -1422,6 +1360,98 @@ fun Queue(
                         )
                         .align(Alignment.BottomCenter),
                 )
+            }
+        }
+    }
+
+    // Rendered here — as a direct sibling of BottomSheet(...), same as showCommentSheet below —
+    // rather than inside collapsedContent above. collapsedContent's own Box is height-constrained
+    // to state.collapsedBound (the small collapsed mini-bar height, see BottomSheet.kt), so an
+    // overlay nested inside it only ever gets that tiny height to work with, which is why it was
+    // rendering as a small squashed strip pinned to the bottom of the screen instead of a proper
+    // full-screen panel. The trigger buttons that set these booleans to true are unchanged and
+    // still live inside collapsedContent above; only where the resulting panel is drawn moved.
+    if (showAudioDeviceBottomSheet) {
+        AudioDeviceBottomSheet(onDismiss = { showAudioDeviceBottomSheet = false })
+    }
+
+    if (showSleepTimerDialog) {
+        val menuGlassConfig = com.krish.jaatplayer.ui.component.LocalMenuGlassConfig.current
+        val useSleepTimerGlass = menuGlassConfig.isEnabledFor(com.krish.jaatplayer.ui.component.GlassMenu.SLEEP_TIMER) &&
+            com.krish.jaatplayer.ui.component.isGlassSupported()
+        val sleepTimerGlassEffectConfig = menuGlassConfig.toGlassEffectConfig(globalEnabled = useSleepTimerGlass)
+
+        // PlayerGlassDialog instead of ActionPromptDialog (which opens a real Dialog(),
+        // a separate Android window). The backdrop blur positions itself using
+        // per-window coordinates, so a glass surface in a separate window samples a
+        // misaligned/frozen crop instead of this screen's live background. See
+        // ui/component/PlayerGlassOverlay.kt for the full explanation.
+        com.krish.jaatplayer.ui.component.PlayerGlassDialog(
+            visible = showSleepTimerDialog,
+            onDismissRequest = { showSleepTimerDialog = false },
+            glassEffectConfig = if (useSleepTimerGlass) sleepTimerGlassEffectConfig else null,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = stringResource(R.string.sleep_timer),
+                        overflow = TextOverflow.Ellipsis,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.headlineSmall,
+                    )
+                }
+            },
+            buttons = {
+                Row(modifier = Modifier.weight(1f)) {
+                    TextButton(onClick = { sleepTimerValue = 30f }) {
+                        Text(stringResource(R.string.reset))
+                    }
+                }
+                TextButton(onClick = { showSleepTimerDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+                TextButton(
+                    onClick = {
+                        showSleepTimerDialog = false
+                        playerConnection.service.sleepTimer.start(sleepTimerValue.roundToInt())
+                    }
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.minute,
+                        sleepTimerValue.roundToInt(),
+                        sleepTimerValue.roundToInt()
+                    ),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Slider(
+                    value = sleepTimerValue,
+                    onValueChange = { sleepTimerValue = it },
+                    valueRange = 5f..120f,
+                    steps = (120 - 5) / 5 - 1,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        showSleepTimerDialog = false
+                        playerConnection.service.sleepTimer.start(-1)
+                    }
+                ) {
+                    Text(stringResource(R.string.end_of_song))
+                }
             }
         }
     }

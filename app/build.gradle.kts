@@ -34,7 +34,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 527
-        versionName = "1.6.0"
+        versionName = "1.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -243,10 +243,19 @@ ksp {
     arg("room.incremental", "true")
 }
 
+androidComponents {
+    beforeVariants { variantBuilder ->
+        if (variantBuilder.buildType == "debug" && variantBuilder.flavorName?.contains("universal") == false) {
+            variantBuilder.enable = false
+        }
+    }
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         freeCompilerArgs.addAll(
-            "-opt-in=kotlin.RequiresOptIn"
+            "-opt-in=kotlin.RequiresOptIn",
+            "-Xbackend-threads=0"
         )
         suppressWarnings.set(false)
     }

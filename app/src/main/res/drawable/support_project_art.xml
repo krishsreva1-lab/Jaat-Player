@@ -1,0 +1,111 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="170dp"
+    android:viewportWidth="200"
+    android:viewportHeight="170">
+
+    <!-- Background Organic Blob -->
+    <path
+        android:fillColor="#DDF2E6"
+        android:pathData="M35,145 C20,80 70,35 110,35 C155,35 180,75 175,145 Z"/>
+
+    <!-- Ground Line -->
+    <path
+        android:strokeColor="#5EAA80"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M25,145 H175"/>
+
+    <!-- Potted Plant (Left) -->
+    <path
+        android:fillColor="#155E3A"
+        android:pathData="M38,125 H50 L48,145 H40 Z"/>
+
+    <!-- Plant Leaves -->
+    <path
+        android:fillColor="#5EAA80"
+        android:pathData="M30,105 C25,115 35,125 42,125 C45,115 35,105 30,105 Z"/>
+    <path
+        android:fillColor="#5EAA80"
+        android:pathData="M38,85 C32,98 44,112 44,125 C48,112 44,95 38,85 Z"/>
+    <path
+        android:fillColor="#5EAA80"
+        android:pathData="M52,108 C58,118 46,125 44,125 C42,115 50,108 52,108 Z"/>
+    <path
+        android:fillColor="#5EAA80"
+        android:pathData="M48,92 C54,104 45,115 44,125 C43,112 50,100 48,92 Z"/>
+
+    <!-- Hoodie Body (Center) -->
+    <path
+        android:fillColor="#155E3A"
+        android:pathData="M52,145 C52,95 72,75 88,70 C102,66 118,85 115,145 Z"/>
+
+    <!-- Outer Hood -->
+    <path
+        android:fillColor="#155E3A"
+        android:pathData="M72,82 C68,52 95,40 112,52 C122,60 118,88 108,90 C95,92 80,88 72,82 Z"/>
+
+    <!-- Inner Hood Shadow -->
+    <path
+        android:fillColor="#0E442A"
+        android:pathData="M80,82 C76,60 98,52 110,60 C113,67 106,82 96,85 Z"/>
+
+    <!-- Skin Face -->
+    <path
+        android:fillColor="#F4C39A"
+        android:pathData="M90,65 C90,58 108,58 108,68 C108,78 90,82 90,65 Z"/>
+
+    <!-- Hair Bangs -->
+    <path
+        android:fillColor="#1B1B1B"
+        android:pathData="M90,70 C92,60 106,58 108,66 C102,70 95,66 90,70 Z"/>
+
+    <!-- Eyes -->
+    <path
+        android:fillColor="#1B1B1B"
+        android:pathData="M98,73 A1.5,1.5 0 1,1 98,72.9 Z M104,73 A1.5,1.5 0 1,1 104,72.9 Z"/>
+
+    <!-- Arm & Sleeves -->
+    <path
+        android:fillColor="#155E3A"
+        android:pathData="M70,108 C78,122 96,138 108,138 L98,145 L62,125 Z"/>
+
+    <!-- Hand on Laptop -->
+    <path
+        android:fillColor="#F4C39A"
+        android:pathData="M95,134 C95,130 108,130 108,138 C108,142 95,142 95,134 Z"/>
+
+    <!-- Laptop Lid / Screen -->
+    <path
+        android:fillColor="#A8BEB5"
+        android:pathData="M102,90 L142,90 L138,140 L98,140 Z"/>
+
+    <!-- Laptop Base -->
+    <path
+        android:fillColor="#708C82"
+        android:pathData="M82,140 L146,140 L144,145 L80,145 Z"/>
+
+    <!-- Laptop Logo -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.75"
+        android:pathData="M120,115 A4,4 0 1,1 120,114.9 Z"/>
+
+    <!-- Laptop Motion Accent Lines -->
+    <path
+        android:strokeColor="#155E3A"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M144,82 L150,77 M146,90 L154,90 M144,98 L150,103"/>
+
+    <!-- Speech Bubble with Heart (Upper Right) -->
+    <path
+        android:fillColor="#CDEFD8"
+        android:pathData="M130,55 A18,18 0 1,1 166,55 A18,18 0 0,1 130,55 Z M132,68 L122,76 L138,72 Z"/>
+
+    <!-- Heart inside Bubble -->
+    <path
+        android:fillColor="#1F6A43"
+        android:pathData="M148,52 C148,48 143,45 140,49 C137,45 132,48 132,52 C132,58 140,64 140,64 C140,64 148,58 148,52 Z"/>
+
+</vector>

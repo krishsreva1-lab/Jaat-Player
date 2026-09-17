@@ -73,7 +73,6 @@ fun AccountSettingsScreen(
     val homeViewModel: HomeViewModel = hiltViewModel()
     val accountSettingsViewModel: AccountSettingsViewModel = hiltViewModel()
     val accountName by homeViewModel.accountName.collectAsState()
-    val accountImageUrl by homeViewModel.accountImageUrl.collectAsState()
 
     var showToken by remember { mutableStateOf(false) }
     var showTokenEditor by remember { mutableStateOf(false) }
@@ -108,27 +107,27 @@ fun AccountSettingsScreen(
                 .verticalScroll(scrollState)
                 .padding(horizontal = 16.dp)
         ) {
-            
+            val (selectedProfileAvatar) = rememberPreference(SelectedProfileAvatarKey, 1)
+            val avatarRes = getProfileAvatarDrawableRes(selectedProfileAvatar)
+
             Material3SettingsGroup(scrollState = scrollState, 
                 title = stringResource(R.string.settings),
                 items = listOf(
                     Material3SettingsItem(
-                        icon = if (isLoggedIn && !accountImageUrl.isNullOrBlank()) null else painterResource(R.drawable.login),
+                        icon = null,
                         title = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (isLoggedIn && !accountImageUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = accountImageUrl,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                }
+                                androidx.compose.foundation.Image(
+                                    painter = painterResource(avatarRes),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = if (isLoggedIn) accountName else stringResource(R.string.login),
+                                    text = if (isLoggedIn) accountName else "Guest Account",
                                     color = MaterialTheme.colorScheme.primary,
                                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
                                 )

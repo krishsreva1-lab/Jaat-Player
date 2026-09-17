@@ -258,13 +258,12 @@ fun SearchScreen(
                             modifier = Modifier
                                 .padding(start = 12.dp, end = 2.dp)
                                 .size(42.dp)
-                                .clip(CircleShape)
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.ic_shazam_logo),
-                                contentDescription = "Shazam",
+                            Icon(
+                                painter = painterResource(R.drawable.ic_shazam_diamond),
+                                contentDescription = "Recognize Music",
                                 modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     }

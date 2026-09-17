@@ -88,7 +88,7 @@ enum class GlassStyle {
 
 /** The individually toggleable menus in the per-menu Liquid Glass system. */
 enum class GlassMenu {
-    PLAYER, QUEUE, QUALITY, SPEAKER, SPEED, SLEEP_TIMER
+    PLAYER, QUEUE, QUALITY, SPEAKER, SPEED, SLEEP_TIMER, EQUALIZER
 }
 
 /**
@@ -109,6 +109,7 @@ data class MenuGlassConfig(
     val speakerMenuEnabled: Boolean = false,
     val speedMenuEnabled: Boolean = false,
     val sleepTimerMenuEnabled: Boolean = false,
+    val equalizerMenuEnabled: Boolean = true,
 ) {
     fun isEnabledFor(menu: GlassMenu): Boolean = when (menu) {
         GlassMenu.PLAYER -> playerMenuEnabled
@@ -117,6 +118,7 @@ data class MenuGlassConfig(
         GlassMenu.SPEAKER -> speakerMenuEnabled
         GlassMenu.SPEED -> speedMenuEnabled
         GlassMenu.SLEEP_TIMER -> sleepTimerMenuEnabled
+        GlassMenu.EQUALIZER -> equalizerMenuEnabled
     }
 
     /** Builds a [GlassEffectConfig] for use with [Modifier.liquidGlass], applying this style's edge-effect defaults. */

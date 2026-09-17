@@ -323,19 +323,16 @@ private fun ReadyState(
     ) {
         Box(
             modifier = Modifier
-                .size(120.dp)
+                .size(140.dp)
                 .scale(scale)
-                .shadow(elevation = 16.dp, shape = CircleShape)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer)
                 .clickable { onStartRecognition() },
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                painter = painterResource(R.drawable.music_note),
+                painter = painterResource(R.drawable.ic_shazam_diamond),
                 contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                modifier = Modifier.fillMaxSize(),
+                tint = MaterialTheme.colorScheme.primary
             )
         }
         
@@ -428,20 +425,12 @@ private fun ProcessingState() {
                 style = MaterialTheme.typography.displaySmall
             )
             
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.music_note),
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Icon(
+                painter = painterResource(R.drawable.ic_shazam_diamond),
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
         
         Text(

@@ -13,7 +13,7 @@ class MusicRecognizerTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
         qsTile?.apply {
-            icon = Icon.createWithResource(this@MusicRecognizerTileService, R.drawable.mic)
+            icon = Icon.createWithResource(this@MusicRecognizerTileService, R.drawable.ic_shazam_diamond)
             state = Tile.STATE_INACTIVE
             updateTile()
         }

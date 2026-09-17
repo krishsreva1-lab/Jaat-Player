@@ -1,4 +1,7 @@
 package com.krish.jaatplayer.ui.screens
+import android.net.Uri
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.activity.compose.BackHandler
@@ -139,15 +142,18 @@ import com.krish.jaatplayer.extensions.toMediaItem
 import com.krish.jaatplayer.LocalDatabase
 import com.krish.jaatplayer.LocalPlayerAwareWindowInsets
 import com.krish.jaatplayer.LocalPlayerConnection
+import com.krish.jaatplayer.extensions.metadata
 import com.krish.jaatplayer.models.toMediaMetadata
 import com.krish.jaatplayer.playback.queues.ListQueue
 import com.krish.jaatplayer.playback.queues.LocalAlbumRadio
 import com.krish.jaatplayer.playback.queues.YouTubeAlbumRadio
 import com.krish.jaatplayer.playback.queues.YouTubeQueue
 import com.krish.jaatplayer.R
+import com.krish.jaatplayer.constants.NextDonationPromptTimeKey
 import com.krish.jaatplayer.ui.component.AlbumGridItem
 import com.krish.jaatplayer.ui.component.ArtistGridItem
 import com.krish.jaatplayer.ui.component.ChipsRow
+import com.krish.jaatplayer.ui.component.DonationDialog
 import com.krish.jaatplayer.ui.component.HideOnScrollFAB
 import com.krish.jaatplayer.ui.component.LocalBottomSheetPageState
 import com.krish.jaatplayer.ui.component.LocalMenuState
@@ -855,6 +861,11 @@ fun HomeScreen(
     val dailyDiscover by viewModel.dailyDiscover.collectAsState()
     val communityPlaylists by viewModel.communityPlaylists.collectAsState()
     val tasteRecommendations by viewModel.tasteRecommendations.collectAsState()
+    val favoritesBasedSongs by viewModel.favoritesBasedSongs.collectAsState()
+
+    // Hero "Queue" — built directly from the live playback queue, no network call, so it
+    // updates the instant the queue changes.
+    val queueWindows by playerConnection.queueWindows.collectAsState()
 
     val allLocalItems by viewModel.allLocalItems.collectAsState()
     val allYtItems by viewModel.allYtItems.collectAsState()
@@ -872,6 +883,8 @@ fun HomeScreen(
 
     val accountName by viewModel.accountName.collectAsState()
     val accountImageUrl by viewModel.accountImageUrl.collectAsState()
+    val (selectedProfileAvatar) = rememberPreference(com.krish.jaatplayer.constants.SelectedProfileAvatarKey, 1)
+    val avatarRes = com.krish.jaatplayer.constants.getProfileAvatarDrawableRes(selectedProfileAvatar)
     val innerTubeCookie by rememberPreference(InnerTubeCookieKey, "")
     val (randomizeHomeOrder) = rememberPreference(RandomizeHomeOrderKey, false)
     val (showSpeedDial) = rememberPreference(ShowSpeedDialKey, true)
@@ -1106,13 +1119,15 @@ fun HomeScreen(
         homePage?.sections,
         explorePage?.moodAndGenres,
         aiRecommendedPlaylist,
-        tasteRecommendations
+        tasteRecommendations,
+        favoritesBasedSongs,
+        queueWindows
     ) {
         val list = mutableListOf<HomeSection>()
 
-        if (homePage?.sections?.isNotEmpty() == true || !quickPicks.isNullOrEmpty()) list.add(HomeSection.HeroBanner)
+        if (favoritesBasedSongs.isNotEmpty() || homePage?.sections?.isNotEmpty() == true || !quickPicks.isNullOrEmpty()) list.add(HomeSection.HeroBanner)
         if (tasteRecommendations.isNotEmpty() || keepListening?.any { it is Song } == true || !quickPicks.isNullOrEmpty()) list.add(HomeSection.TasteHero)
-        if (dailyDiscover?.isNotEmpty() == true || !forgottenFavorites.isNullOrEmpty() || !quickPicks.isNullOrEmpty()) list.add(HomeSection.DiscoveryHero)
+        if (queueWindows.isNotEmpty() || !forgottenFavorites.isNullOrEmpty() || !quickPicks.isNullOrEmpty()) list.add(HomeSection.DiscoveryHero)
         
         if (showSpeedDial && speedDialItems.isNotEmpty()) list.add(HomeSection.SpeedDial)
         if (aiRecommendedPlaylist != null && aiRecommendedPlaylist!!.second.isNotEmpty()) list.add(HomeSection.AiRecommendations)
@@ -1216,6 +1231,39 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.TopStart
         ) {
+            val context = LocalContext.current
+            val (nextDonationPromptTime, onNextDonationPromptTimeChange) = rememberPreference(
+                NextDonationPromptTimeKey, defaultValue = 0L
+            )
+            var showDonationPopup by remember { mutableStateOf(false) }
+
+            LaunchedEffect(nextDonationPromptTime) {
+                val currentTime = System.currentTimeMillis()
+                if (nextDonationPromptTime == 0L || currentTime >= nextDonationPromptTime) {
+                    showDonationPopup = true
+                }
+            }
+
+            if (showDonationPopup) {
+                DonationDialog(
+                    onDismiss = {
+                        onNextDonationPromptTimeChange(System.currentTimeMillis() + 2 * 24 * 60 * 60 * 1000L)
+                        showDonationPopup = false
+                    },
+                    onDonate = {
+                        onNextDonationPromptTimeChange(System.currentTimeMillis() + 7 * 24 * 60 * 60 * 1000L)
+                        showDonationPopup = false
+
+                        val upiUri = Uri.parse("upi://pay?pa=9887624399@fam&pn=Jaat%20Player&tn=Support%20Jaat%20Player&cu=INR")
+                        val intent = Intent(Intent.ACTION_VIEW, upiUri)
+                        try {
+                            context.startActivity(Intent.createChooser(intent, "Pay with UPI"))
+                        } catch (_: Exception) {
+                            Toast.makeText(context, "No UPI app found on device", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+            }
             val horizontalLazyGridItemWidthFactor = if (maxWidth * 0.475f >= 320.dp) 0.475f else 0.9f
             val horizontalLazyGridItemWidth = maxWidth * horizontalLazyGridItemWidthFactor
             val quickPicksSnapLayoutInfoProvider = remember(quickPicksLazyGridState) {
@@ -1233,12 +1281,6 @@ fun HomeScreen(
                         (layoutSize * horizontalLazyGridItemWidthFactor / 2f - itemSize / 2f)
                     }
                 )
-            }
-
-            // Hero sections should surface songs you're not already seeing in Speed Dial or
-            // Keep Listening, not repeat them.
-            val excludedFromHeroIds = remember(speedDialItems, keepListening) {
-                (speedDialItems.map { it.id } + keepListening.orEmpty().map { it.id }).toSet()
             }
 
             LazyColumn(
@@ -1283,16 +1325,14 @@ fun HomeScreen(
                     val (section, design) = pair
                     when (section) {
                         HomeSection.HeroBanner -> {
+                            // Hero "Favorites": setup choices + in-app favorites (liked
+                            // songs/followed artists) — see JaatAlgorithm.buildFavoritesBasedSongs.
+                            // Falls back to YouTube's home feed, then local quick picks, so this
+                            // never goes empty even before that fetch completes.
                             val heroSection = homePage?.sections?.firstOrNull { 
                                 it.items.any { item -> item is SongItem } 
                             } ?: homePage?.sections?.firstOrNull()
-                            
                             val homeSongItems = heroSection?.items?.filterIsInstance<SongItem>() ?: emptyList()
-                            // YouTube's home feed is mostly playlist/mix/album shelves, not raw song
-                            // shelves — this filter comes up empty most of the time regardless of
-                            // network success. Fall back to local quick picks (no network dependency,
-                            // pure DB query) so this hero reliably has something to show instead of
-                            // depending on the home feed happening to contain a song-shaped shelf.
                             val quickPicksAsSongItems = quickPicks.orEmpty().map { song ->
                                 SongItem(
                                     id = song.id,
@@ -1302,9 +1342,9 @@ fun HomeScreen(
                                     explicit = false
                                 )
                             }
-                            val songItems = homeSongItems.ifEmpty { quickPicksAsSongItems }
-                                .filterNot { it.id in excludedFromHeroIds }
-                            val bannerTitle = if (homeSongItems.isNotEmpty()) heroSection?.title else null
+                            val songItems = favoritesBasedSongs
+                                .ifEmpty { homeSongItems }
+                                .ifEmpty { quickPicksAsSongItems }
                             
                             if (songItems.isNotEmpty()) {
                                 item(key = "hero_banner") {
@@ -1316,7 +1356,7 @@ fun HomeScreen(
                                         menuState = menuState,
                                         haptic = haptic,
                                         scope = scope,
-                                        title = bannerTitle
+                                        title = null
                                     )
                                 }
                             }
@@ -1358,15 +1398,30 @@ fun HomeScreen(
                                         menuState = menuState,
                                         haptic = haptic,
                                         scope = scope,
-                                        title = "Based on your recent taste"
+                                        title = null
                                     )
                                 }
                             }
                         }
                         HomeSection.DiscoveryHero -> {
-                            val networkSongItems = dailyDiscover.orEmpty()
-                                .map { it.recommendation }
-                                .filterIsInstance<SongItem>()
+                            // Hero "Queue": built directly from your current playback queue —
+                            // no network fetch, so it updates the instant the queue changes.
+                            val queueSongItems = queueWindows.mapNotNull { window ->
+                                val metadata = window.mediaItem.metadata ?: return@mapNotNull null
+                                SongItem(
+                                    id = metadata.id,
+                                    title = metadata.title,
+                                    artists = metadata.artists.map {
+                                        com.music.innertube.models.Artist(name = it.name, id = it.id ?: "")
+                                    },
+                                    thumbnail = metadata.thumbnailUrl ?: "",
+                                    explicit = metadata.explicit
+                                )
+                            }.distinctBy { it.id }
+
+                            // If the queue is empty (nothing playing yet), fall back to forgotten
+                            // favorites, then quick picks, same guaranteed-not-empty reasoning as
+                            // the other heroes.
                             val localFallbackSongItems = forgottenFavorites.orEmpty().map { song ->
                                 SongItem(
                                     id = song.id,
@@ -1376,9 +1431,6 @@ fun HomeScreen(
                                     explicit = false
                                 )
                             }
-                            // Final guaranteed fallback, same reasoning as TasteHero above —
-                            // shuffled with a fixed different order (dropped/rotated) so all three
-                            // heroes don't ever render the exact same carousel.
                             val guaranteedFallbackSongItems = quickPicks.orEmpty().let { list ->
                                 if (list.size > 1) list.drop(list.size / 2) + list.take(list.size / 2) else list
                             }.map { song ->
@@ -1390,7 +1442,7 @@ fun HomeScreen(
                                     explicit = false
                                 )
                             }
-                            val songItems = networkSongItems.ifEmpty { localFallbackSongItems }.ifEmpty { guaranteedFallbackSongItems }
+                            val songItems = queueSongItems.ifEmpty { localFallbackSongItems }.ifEmpty { guaranteedFallbackSongItems }
                             if (songItems.isNotEmpty()) {
                                 item(key = "discovery_hero") {
                                     HomeHeroCarousel(
@@ -1401,7 +1453,7 @@ fun HomeScreen(
                                         menuState = menuState,
                                         haptic = haptic,
                                         scope = scope,
-                                        title = "Daily Discovery"
+                                        title = null
                                     )
                                 }
                             }
@@ -1866,29 +1918,14 @@ fun HomeScreen(
                                         label = stringResource(R.string.your_youtube_playlists),
                                         title = accountName,
                                         thumbnail = {
-                                            if (url != null) {
-                                                AsyncImage(
-                                                    model = ImageRequest.Builder(LocalContext.current)
-                                                        .data(url)
-                                                        .diskCachePolicy(CachePolicy.ENABLED)
-                                                        .diskCacheKey(url)
-                                                        .crossfade(false)
-                                                        .build(),
-                                                    placeholder = painterResource(id = R.drawable.person),
-                                                    error = painterResource(id = R.drawable.person),
-                                                    contentDescription = null,
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier
-                                                        .size(ListThumbnailSize)
-                                                        .clip(CircleShape)
-                                                )
-                                            } else {
-                                                Icon(
-                                                    painter = painterResource(id = R.drawable.person),
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(ListThumbnailSize)
-                                                )
-                                            }
+                                            androidx.compose.foundation.Image(
+                                                painter = painterResource(id = avatarRes),
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .size(ListThumbnailSize)
+                                                    .clip(CircleShape)
+                                            )
                                         },
                                         onClick = {
                                             navController.navigate("account")

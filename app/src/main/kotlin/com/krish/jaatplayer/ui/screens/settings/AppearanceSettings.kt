@@ -12,6 +12,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -1137,6 +1145,42 @@ highlightKey: String? = null) {
                         onClick = { onLiquidGlassAdoptThemeColorChange(!liquidGlassAdoptThemeColor) }
                     )
                 )
+
+                val (selectedProfileAvatar, onSelectedProfileAvatarChange) = rememberPreference(
+                    com.krish.jaatplayer.constants.SelectedProfileAvatarKey,
+                    defaultValue = 1
+                )
+                var showAvatarDialog by remember { mutableStateOf(false) }
+
+                if (showAvatarDialog) {
+                    AvatarSelectionDialog(
+                        currentAvatar = selectedProfileAvatar,
+                        onDismiss = { showAvatarDialog = false },
+                        onSelect = { avatarId ->
+                            onSelectedProfileAvatarChange(avatarId)
+                            showAvatarDialog = false
+                        }
+                    )
+                }
+
+                add(
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.account),
+                        title = { Text("Profile Avatar") },
+                        description = { Text("Choose your default profile avatar logo") },
+                        trailingContent = {
+                            Image(
+                                painter = painterResource(com.krish.jaatplayer.constants.getProfileAvatarDrawableRes(selectedProfileAvatar)),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                            )
+                        },
+                        onClick = { showAvatarDialog = true }
+                    )
+                )
             }
         )
 
@@ -2089,4 +2133,56 @@ enum class LyricsPosition {
 enum class PlayerTextAlignment {
     SIDED,
     CENTER,
+}
+
+@Composable
+private fun AvatarSelectionDialog(
+    currentAvatar: Int,
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Profile Avatar", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                val avatars = listOf(1, 2, 3, 4, 5, 6)
+                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(3),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.height(220.dp)
+                ) {
+                    items(avatars.size) { index ->
+                        val id = avatars[index]
+                        val isSelected = id == currentAvatar
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .border(
+                                    width = if (isSelected) 3.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    shape = CircleShape
+                                )
+                                .clickable { onSelect(id) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(com.krish.jaatplayer.constants.getProfileAvatarDrawableRes(id)),
+                                contentDescription = "Avatar $id",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize().clip(CircleShape)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        }
+    )
 }

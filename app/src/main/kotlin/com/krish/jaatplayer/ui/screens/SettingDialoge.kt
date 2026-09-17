@@ -32,7 +32,6 @@ import com.krish.jaatplayer.constants.AudioQualityKey
 import com.krish.jaatplayer.constants.AudioQuality
 import com.krish.jaatplayer.ui.component.Material3SettingsGroup
 import com.krish.jaatplayer.ui.component.Material3SettingsItem
-import com.krish.jaatplayer.ui.component.liquidGlass
 import com.krish.jaatplayer.utils.rememberPreference
 import com.krish.jaatplayer.utils.rememberEnumPreference
 import com.krish.jaatplayer.viewmodels.HomeViewModel
@@ -56,10 +55,12 @@ fun SettingDialoge(
 
     val (accountEmail, _) = rememberPreference(AccountEmailKey, "")
     val accountName by homeViewModel.accountName.collectAsState()
-    val accountImageUrl by homeViewModel.accountImageUrl.collectAsState()
 
     val (useLoginForBrowse, onUseLoginForBrowseChange) = rememberPreference(UseLoginForBrowse, true)
     val (ytmSync, onYtmSyncChange) = rememberPreference(YtmSyncKey, true)
+
+    val (selectedProfileAvatar) = rememberPreference(com.krish.jaatplayer.constants.SelectedProfileAvatarKey, 1)
+    val avatarRes = com.krish.jaatplayer.constants.getProfileAvatarDrawableRes(selectedProfileAvatar)
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -68,25 +69,16 @@ fun SettingDialoge(
         val primaryColor = MaterialTheme.colorScheme.onSurface
         val onSecondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-        val qualityMenuGlassConfig = com.krish.jaatplayer.ui.component.LocalMenuGlassConfig.current
-        val useQualityGlass = qualityMenuGlassConfig.isEnabledFor(com.krish.jaatplayer.ui.component.GlassMenu.QUALITY) &&
-            com.krish.jaatplayer.ui.component.isGlassSupported()
-        val qualityGlassEffectConfig = qualityMenuGlassConfig.toGlassEffectConfig(globalEnabled = useQualityGlass)
         val dialogShape = RoundedCornerShape(28.dp)
 
         Card(
             modifier = Modifier
                 .padding(24.dp)
                 .widthIn(max = 540.dp)
-                .fillMaxWidth()
-                .then(
-                    if (useQualityGlass) {
-                        Modifier.liquidGlass(config = qualityGlassEffectConfig, shape = dialogShape)
-                    } else Modifier
-                ),
+                .fillMaxWidth(),
             shape = dialogShape,
             colors = CardDefaults.cardColors(
-                containerColor = if (useQualityGlass) androidx.compose.ui.graphics.Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
@@ -135,21 +127,19 @@ fun SettingDialoge(
                     items = buildList {
                         add(
                             Material3SettingsItem(
-                                title = { Text(if (isLoggedIn) accountName else "Anonymous") },
+                                title = { Text(if (isLoggedIn) accountName else "Guest Account") },
                                 description = { Text(if (isLoggedIn) accountEmail.ifEmpty { "Logged In" } else "Not Logged In") },
                                 icon = painterResource(R.drawable.account),
-                                trailingContent = if (isLoggedIn && !accountImageUrl.isNullOrBlank()) {
-                                    {
-                                        AsyncImage(
-                                            model = accountImageUrl,
-                                            contentDescription = "Profile Photo",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier
-                                                .size(40.dp)
-                                                .clip(CircleShape)
-                                        )
-                                    }
-                                } else null,
+                                trailingContent = {
+                                    androidx.compose.foundation.Image(
+                                        painter = painterResource(avatarRes),
+                                        contentDescription = "Profile Photo",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                    )
+                                },
                                 onClick = { if (isLoggedIn) onNavigate("settings/account") else onNavigate("login") }
                             )
                         )
