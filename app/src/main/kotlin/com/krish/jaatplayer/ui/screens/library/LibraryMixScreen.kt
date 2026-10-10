@@ -100,6 +100,7 @@ import com.krish.jaatplayer.ui.component.AutoPlaylistButton
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -371,13 +372,18 @@ fun LibraryMixScreen(
                                 )
                             }
                             AutoPlaylistButton(
+                                title = stringResource(R.string.identified_songs),
+                                icon = R.drawable.ic_shazam_diamond,
+                                iconTint = MaterialTheme.colorScheme.onSurface,
+                                onClick = { navController.navigate("recognition_history") },
+                                modifier = itemModifier
+                            )
+                            AutoPlaylistButton(
                                 title = stringResource(R.string.filter_local),
                                 icon = R.drawable.snippet_folder,
                                 iconTint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                                 onClick = { navController.navigate("local_songs") },
-                                modifier = Modifier
-                                    .fillMaxWidth(0.5f)
-                                    .padding(end = 4.dp)
+                                modifier = itemModifier
                             )
                         }
                     }
@@ -622,13 +628,18 @@ fun LibraryMixScreen(
                                 )
                             }
                             AutoPlaylistButton(
+                                title = stringResource(R.string.identified_songs),
+                                icon = R.drawable.ic_shazam_diamond,
+                                iconTint = MaterialTheme.colorScheme.onSurface,
+                                onClick = { navController.navigate("recognition_history") },
+                                modifier = itemModifier
+                            )
+                            AutoPlaylistButton(
                                 title = stringResource(R.string.filter_local),
                                 icon = R.drawable.snippet_folder,
                                 iconTint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
                                 onClick = { navController.navigate("local_songs") },
-                                modifier = Modifier
-                                    .fillMaxWidth(0.5f)
-                                    .padding(end = 4.dp)
+                                modifier = itemModifier
                             )
                         }
                     }

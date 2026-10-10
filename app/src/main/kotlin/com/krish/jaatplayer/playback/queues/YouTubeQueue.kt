@@ -18,15 +18,6 @@ class YouTubeQueue(
     private var retryCount = 0
     private val maxRetries = 3
 
-    init {
-        if (endpoint.videoId != null && endpoint.playlistId == null) {
-            endpoint = WatchEndpoint(
-                videoId = endpoint.videoId,
-                playlistId = "RDAMVM${endpoint.videoId}"
-            )
-        }
-    }
-
     override suspend fun getInitialStatus(): Queue.Status {
         return withContext(IO) {
             var lastException: Throwable? = null
@@ -87,7 +78,7 @@ class YouTubeQueue(
         
         fun radio(song: MediaMetadata): YouTubeQueue {
             return YouTubeQueue(
-                WatchEndpoint(videoId = song.id, playlistId = "RDAMVM${song.id}"),
+                WatchEndpoint(videoId = song.id),
                 song
             )
         }

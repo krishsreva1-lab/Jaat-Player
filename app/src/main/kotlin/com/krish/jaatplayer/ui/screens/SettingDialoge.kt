@@ -1,6 +1,19 @@
 package com.krish.jaatplayer.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import coil3.compose.AsyncImage
 import com.music.innertube.utils.parseCookieString
 import com.krish.jaatplayer.BuildConfig
@@ -30,8 +45,12 @@ import com.krish.jaatplayer.constants.UseLoginForBrowse
 import com.krish.jaatplayer.constants.YtmSyncKey
 import com.krish.jaatplayer.constants.AudioQualityKey
 import com.krish.jaatplayer.constants.AudioQuality
+import com.krish.jaatplayer.ui.component.GlassMenu
+import com.krish.jaatplayer.ui.component.LocalMenuGlassConfig
 import com.krish.jaatplayer.ui.component.Material3SettingsGroup
 import com.krish.jaatplayer.ui.component.Material3SettingsItem
+import com.krish.jaatplayer.ui.component.isGlassSupported
+import com.krish.jaatplayer.ui.component.liquidGlass
 import com.krish.jaatplayer.utils.rememberPreference
 import com.krish.jaatplayer.utils.rememberEnumPreference
 import com.krish.jaatplayer.viewmodels.HomeViewModel
@@ -39,6 +58,157 @@ import androidx.compose.ui.layout.ContentScale
 
 @Composable
 fun SettingDialoge(
+    onDismissRequest: () -> Unit,
+    onNavigate: (String) -> Unit,
+    homeViewModel: HomeViewModel
+) {
+    val menuGlassConfig = LocalMenuGlassConfig.current
+    val useGlassEffect = remember(menuGlassConfig) {
+        menuGlassConfig.isEnabledFor(GlassMenu.SETTINGS) && isGlassSupported()
+    }
+
+    if (useGlassEffect) {
+        SettingDialogeGlass(onDismissRequest, onNavigate, homeViewModel, menuGlassConfig)
+    } else {
+        SettingDialogeMaterial(onDismissRequest, onNavigate, homeViewModel)
+    }
+}
+
+/**
+ * Original solid Material3 card, wrapped in a real [Dialog] (its own window). Used
+ * whenever the Settings Menu liquid glass toggle (Liquid Glass beta settings) is off,
+ * or the device doesn't support the backdrop blur pipeline.
+ */
+@Composable
+private fun SettingDialogeMaterial(
+    onDismissRequest: () -> Unit,
+    onNavigate: (String) -> Unit,
+    homeViewModel: HomeViewModel
+) {
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .padding(24.dp)
+                .widthIn(max = 540.dp)
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 16.dp, horizontal = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                SettingDialogeContent(onDismissRequest, onNavigate, homeViewModel)
+            }
+        }
+    }
+}
+
+/**
+ * True Liquid Glass presentation: rendered as a same-window [Popup] (matching the
+ * player's [com.krish.jaatplayer.ui.menu.LiquidGlassPlayerDock] pattern) so the
+ * backdrop blur samples the real Home screen content behind it — including the
+ * bottom mini player and navigation bar — instead of a frozen/misaligned capture,
+ * which is what happens when a glass surface is wrapped in [Dialog].
+ */
+@Composable
+private fun SettingDialogeGlass(
+    onDismissRequest: () -> Unit,
+    onNavigate: (String) -> Unit,
+    homeViewModel: HomeViewModel,
+    menuGlassConfig: com.krish.jaatplayer.ui.component.MenuGlassConfig
+) {
+    val glassEffectConfig = menuGlassConfig.toGlassEffectConfig(globalEnabled = true)
+    var isPopupActive by remember { mutableStateOf(true) }
+    // Drives the actual enter/exit animation. Requesting a dismiss (scrim tap, back
+    // press, a menu item navigating away) sets this false first instead of tearing
+    // the Popup down immediately, so the exit transition gets to play; the real
+    // onDismissRequest() (which unmounts this composable at the call site) only
+    // fires once that exit animation has actually finished, from the
+    // DisposableEffect below.
+    var isVisible by remember { mutableStateOf(true) }
+    val requestDismiss: () -> Unit = { isVisible = false }
+
+    if (isPopupActive) {
+        Popup(
+            onDismissRequest = requestDismiss,
+            properties = PopupProperties(
+                focusable = true,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true,
+                excludeFromSystemGesture = false,
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = requestDismiss
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = slideInVertically(
+                        initialOffsetY = { it / 8 },
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                    ) + scaleIn(
+                        initialScale = 0.85f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it / 14 },
+                        animationSpec = tween(220)
+                    ) + scaleOut(
+                        targetScale = 0.9f,
+                        animationSpec = tween(220)
+                    ) + fadeOut(animationSpec = tween(200)),
+                ) {
+                    DisposableEffect(Unit) {
+                        onDispose {
+                            isPopupActive = false
+                            onDismissRequest()
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(24.dp)
+                            .widthIn(max = 540.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(28.dp))
+                            .liquidGlass(config = glassEffectConfig, shape = RoundedCornerShape(28.dp))
+                            .clickable(enabled = false) {}, // absorb clicks so they don't fall through to dismiss
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(vertical = 16.dp, horizontal = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            SettingDialogeContent(requestDismiss, onNavigate, homeViewModel)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.SettingDialogeContent(
     onDismissRequest: () -> Unit,
     onNavigate: (String) -> Unit,
     homeViewModel: HomeViewModel
@@ -62,34 +232,10 @@ fun SettingDialoge(
     val (selectedProfileAvatar) = rememberPreference(com.krish.jaatplayer.constants.SelectedProfileAvatarKey, 1)
     val avatarRes = com.krish.jaatplayer.constants.getProfileAvatarDrawableRes(selectedProfileAvatar)
 
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        val primaryColor = MaterialTheme.colorScheme.onSurface
-        val onSecondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.onSurface
+    val onSecondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-        val dialogShape = RoundedCornerShape(28.dp)
-
-        Card(
-            modifier = Modifier
-                .padding(24.dp)
-                .widthIn(max = 540.dp)
-                .fillMaxWidth(),
-            shape = dialogShape,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = 16.dp, horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Header
+    // Header
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -231,17 +377,14 @@ fun SettingDialoge(
                         text = "Privacy Policy",
                         style = MaterialTheme.typography.bodySmall,
                         color = onSecondaryColor,
-                        modifier = Modifier.clickable { uriHandler.openUri("https://jaatplayerr.netlify.app/") }.padding(4.dp)
+                        modifier = Modifier.clickable { uriHandler.openUri("https://jaatplayerr.web.app/") }.padding(4.dp)
                     )
                     Text(text = " • ", color = onSecondaryColor, style = MaterialTheme.typography.bodySmall)
                     Text(
                         text = "Terms of Service",
                         style = MaterialTheme.typography.bodySmall,
                         color = onSecondaryColor,
-                        modifier = Modifier.clickable { uriHandler.openUri("https://jaatplayerr.netlify.app/") }.padding(4.dp)
+                        modifier = Modifier.clickable { uriHandler.openUri("https://jaatplayerr.web.app/") }.padding(4.dp)
                     )
                 }
-            }
-        }
-    }
 }

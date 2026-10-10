@@ -34,6 +34,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import android.content.Intent
+import android.media.audiofx.AudioEffect
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.krish.jaatplayer.LocalPlayerConnection
 import com.krish.jaatplayer.R
 import com.krish.jaatplayer.constants.JaatStyleMode
 import com.krish.jaatplayer.eq.audio.Reverb3DPreset
@@ -51,6 +56,9 @@ fun EqualizerGlassCard(
     val reverbPreset by viewModel.reverbPreset.collectAsState()
     val jaatStylesEnabled by viewModel.jaatStylesEnabled.collectAsState()
     val jaatStyleMode by viewModel.jaatStyleMode.collectAsState()
+
+    val context = LocalContext.current
+    val playerConnection = LocalPlayerConnection.current
 
     val menuGlassConfig = LocalMenuGlassConfig.current
     val cardShape = RoundedCornerShape(28.dp)
@@ -121,18 +129,9 @@ fun EqualizerGlassCard(
         else -> "3D Reverb"
     }
 
-    // Jaat Styles active state & label
+    // Jaat Spatial active state & label
     val isJaatStyleActive = jaatStylesEnabled && enabled
-    val jaatStyleLabel = if (isJaatStyleActive) {
-        when (jaatStyleMode) {
-            JaatStyleMode.BASS_DROP -> "Styles (Bass)"
-            JaatStyleMode.MASHUP -> "Styles (Mashup)"
-            JaatStyleMode.SPATIAL_8D -> "Styles (8D)"
-            JaatStyleMode.FILTER_SWEEP -> "Styles (DJ)"
-        }
-    } else {
-        "Jaat Styles FX"
-    }
+    val jaatStyleLabel = if (isJaatStyleActive) "Spatial (8D)" else "Jaat Spatial FX"
 
     Surface(
         modifier = modifier
@@ -181,16 +180,44 @@ fun EqualizerGlassCard(
                     )
                 }
 
-                IconButton(
-                    onClick = onOpenAdvancedEq,
-                    modifier = Modifier.size(32.dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        painter = painterResource(R.drawable.tune),
-                        contentDescription = "Advanced Equalizer Options",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    IconButton(
+                        onClick = {
+                            val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+                                putExtra(AudioEffect.EXTRA_AUDIO_SESSION, playerConnection?.service?.player?.audioSessionId ?: 0)
+                                putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+                                putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+                            }
+                            runCatching {
+                                context.startActivity(intent)
+                            }.onFailure {
+                                Toast.makeText(context, "System Equalizer is not available on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.settings),
+                            contentDescription = "System Equalizer",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onOpenAdvancedEq,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.tune),
+                            contentDescription = "Advanced Equalizer Options",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
@@ -307,22 +334,12 @@ fun EqualizerGlassCard(
                     }
                 }
 
-                // Jaat Styles FX button with mode cycling
+                // Jaat Styles FX button — simple on/off (only 8D Spatial remains)
                 ToggleButton(
                     checked = isJaatStyleActive,
                     onCheckedChange = {
                         if (!enabled) viewModel.setEnabled(true)
-                        if (!jaatStylesEnabled) {
-                            viewModel.setJaatStylesEnabled(true)
-                            viewModel.setJaatStyleMode(JaatStyleMode.BASS_DROP)
-                        } else {
-                            when (jaatStyleMode) {
-                                JaatStyleMode.BASS_DROP -> viewModel.setJaatStyleMode(JaatStyleMode.MASHUP)
-                                JaatStyleMode.MASHUP -> viewModel.setJaatStyleMode(JaatStyleMode.SPATIAL_8D)
-                                JaatStyleMode.SPATIAL_8D -> viewModel.setJaatStyleMode(JaatStyleMode.FILTER_SWEEP)
-                                JaatStyleMode.FILTER_SWEEP -> viewModel.setJaatStylesEnabled(false)
-                            }
-                        }
+                        viewModel.setJaatStylesEnabled(!jaatStylesEnabled)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {

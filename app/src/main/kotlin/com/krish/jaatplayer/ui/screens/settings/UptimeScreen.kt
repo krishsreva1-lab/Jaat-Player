@@ -60,7 +60,7 @@ highlightKey: String? = null) {
 
     val canvasServices = remember {
         mutableStateListOf(
-            ServiceStatus("Jaat Canvas", { "https://canvas.jaatplayer.fun" }),
+            ServiceStatus("Jaat Motion", { "https://canvas.jaatplayer.fun" }),
             ServiceStatus("Tidal Canvas", { "https://api.tidal.com/v1/" })
         )
     }
@@ -91,7 +91,7 @@ highlightKey: String? = null) {
     val otherServices = remember {
         mutableStateListOf(
             ServiceStatus("Apple Music API", { "https://amp-api.music.apple.com" }),
-            ServiceStatus("Jaat Find (Shazam)", { "https://amp.shazam.com" })
+            ServiceStatus("Jaat Identify (Shazam)", { "https://amp.shazam.com" })
         )
     }
 

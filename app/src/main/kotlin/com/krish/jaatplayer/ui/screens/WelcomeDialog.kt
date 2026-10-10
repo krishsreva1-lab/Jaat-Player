@@ -1,8 +1,18 @@
 package com.krish.jaatplayer.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,16 +47,42 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import com.krish.jaatplayer.BuildConfig
 import com.krish.jaatplayer.R
+import com.krish.jaatplayer.ui.component.GlassComponent
+import com.krish.jaatplayer.ui.component.LocalGlassEffectConfig
+import com.krish.jaatplayer.ui.component.isGlassSupported
+import com.krish.jaatplayer.ui.component.liquidGlass
 
+/**
+ * One-time "what's new" popup shown on the Home screen the first time the app is
+ * opened after installing a new version (see the `lastOpenedVersionCode` check in
+ * MainActivity). Renders as true Liquid Glass — sampling the real Home screen
+ * behind it — when Liquid Glass beta + the Menu surface toggle are on; otherwise
+ * falls back to the original solid Material3 card.
+ */
 @Composable
 fun WelcomeDialog(
     onDismissRequest: () -> Unit
 ) {
-    val uriHandler = LocalUriHandler.current
-    val context = LocalContext.current
+    val glassConfig = LocalGlassEffectConfig.current
+    val useGlassEffect = remember(glassConfig) {
+        glassConfig.isEnabledFor(GlassComponent.MENU) && isGlassSupported()
+    }
 
+    if (useGlassEffect) {
+        WelcomeDialogGlass(onDismissRequest, glassConfig)
+    } else {
+        WelcomeDialogMaterial(onDismissRequest)
+    }
+}
+
+@Composable
+private fun WelcomeDialogMaterial(
+    onDismissRequest: () -> Unit
+) {
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -68,7 +104,100 @@ fun WelcomeDialog(
                     .padding(vertical = 20.dp, horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Main Header
+                WelcomeDialogContent(onDismissRequest)
+            }
+        }
+    }
+}
+
+/** Same-window [Popup] + [liquidGlass] so the backdrop blur samples the real Home
+ * screen (mini player, nav bar and all) instead of a Dialog's separate window. */
+@Composable
+private fun WelcomeDialogGlass(
+    onDismissRequest: () -> Unit,
+    glassConfig: com.krish.jaatplayer.ui.component.GlassEffectConfig
+) {
+    var isPopupActive by remember { mutableStateOf(true) }
+    var isVisible by remember { mutableStateOf(true) }
+    val requestDismiss: () -> Unit = { isVisible = false }
+
+    if (isPopupActive) {
+        Popup(
+            onDismissRequest = requestDismiss,
+            properties = PopupProperties(
+                focusable = true,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true,
+                excludeFromSystemGesture = false,
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = requestDismiss
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                AnimatedVisibility(
+                    visible = isVisible,
+                    enter = slideInVertically(
+                        initialOffsetY = { it / 8 },
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                    ) + scaleIn(
+                        initialScale = 0.85f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                    ) + fadeIn(animationSpec = tween(300)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it / 14 },
+                        animationSpec = tween(220)
+                    ) + scaleOut(
+                        targetScale = 0.9f,
+                        animationSpec = tween(220)
+                    ) + fadeOut(animationSpec = tween(200)),
+                ) {
+                    DisposableEffect(Unit) {
+                        onDispose {
+                            isPopupActive = false
+                            onDismissRequest()
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .padding(24.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(28.dp))
+                            .liquidGlass(config = glassConfig, shape = RoundedCornerShape(28.dp))
+                            .clickable(enabled = false) {},
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(vertical = 20.dp, horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            WelcomeDialogContent(requestDismiss)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.WelcomeDialogContent(
+    onDismissRequest: () -> Unit
+) {
+    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+
+    run {
+        // Main Header
                 WelcomeAppCard()
 
                 WelcomeSectionCard(title = "Developer") {
@@ -82,15 +211,15 @@ fun WelcomeDialog(
                     WelcomeActionRow(
                         icon = painterResource(R.drawable.website),
                         title = "Website",
-                        subtitle = "jaatplayerr.netlify.app",
-                        onClick = { uriHandler.openUri("https://jaatplayerr.netlify.app/") }
+                        subtitle = "jaatplayerr.web.app",
+                        onClick = { uriHandler.openUri("https://jaatplayerr.web.app/") }
                     )
                     WelcomeDivider()
                     WelcomeActionRow(
                         icon = painterResource(R.drawable.person),
                         title = "About Developer",
                         subtitle = "Know more about me",
-                        onClick = { uriHandler.openUri("https://jaatplayerr.netlify.app/") }
+                        onClick = { uriHandler.openUri("https://jaatplayerr.web.app/") }
                     )
                 }
 
@@ -160,8 +289,6 @@ fun WelcomeDialog(
                 ) {
                     Text("Continue", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
-            }
-        }
     }
 }
 

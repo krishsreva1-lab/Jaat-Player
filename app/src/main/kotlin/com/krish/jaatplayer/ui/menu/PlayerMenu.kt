@@ -841,6 +841,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
             if (!isInRoom) {
                 ValueAdjuster(
                     icon = R.drawable.speed,
+                    label = stringResource(R.string.speed),
                     currentValue = tempo,
                     values = (0..35).map { round((0.25f + it * 0.05f) * 100) / 100 },
                     onValueUpdate = {
@@ -853,6 +854,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
             }
             ValueAdjuster(
                 icon = R.drawable.discover_tune,
+                label = stringResource(R.string.pitch),
                 currentValue = transposeValue,
                 values = (-12..12).toList(),
                 onValueUpdate = {
@@ -893,6 +895,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
                 if (!isInRoom) {
                     ValueAdjuster(
                         icon = R.drawable.speed,
+                        label = stringResource(R.string.speed),
                         currentValue = tempo,
                         values = (0..35).map { round((0.25f + it * 0.05f) * 100) / 100 },
                         onValueUpdate = {
@@ -905,6 +908,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
                 }
                 ValueAdjuster(
                     icon = R.drawable.discover_tune,
+                    label = stringResource(R.string.pitch),
                     currentValue = transposeValue,
                     values = (-12..12).toList(),
                     onValueUpdate = {
@@ -921,6 +925,7 @@ fun TempoPitchDialog(onDismiss: () -> Unit) {
 @Composable
 fun <T> ValueAdjuster(
     @DrawableRes icon: Int,
+    label: String? = null,
     currentValue: T,
     values: List<T>,
     onValueUpdate: (T) -> Unit,
@@ -928,15 +933,27 @@ fun <T> ValueAdjuster(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Icon(
             painter = painterResource(icon),
             contentDescription = null,
-            modifier = Modifier.size(28.dp),
+            modifier = Modifier.size(24.dp),
         )
+
+        if (label != null) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
 
         IconButton(
             enabled = currentValue != values.first(),
@@ -954,7 +971,7 @@ fun <T> ValueAdjuster(
             text = valueText(currentValue),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(80.dp),
+            modifier = Modifier.width(60.dp),
         )
 
         IconButton(

@@ -41,6 +41,8 @@ import com.krish.jaatplayer.jaat.component.UpdateInfoDialog
 import com.krish.jaatplayer.ui.utils.backToMain
 import com.krish.jaatplayer.jaat.updater.getAutoUpdateCheckSetting
 import com.krish.jaatplayer.jaat.updater.saveAutoUpdateCheckSetting
+import com.krish.jaatplayer.jaat.updater.getAutoDownloadUpdateSetting
+import com.krish.jaatplayer.jaat.updater.saveAutoDownloadUpdateSetting
 import com.krish.jaatplayer.jaat.updater.getUpdateAvailableState
 import com.krish.jaatplayer.jaat.updater.saveUpdateAvailableState
 import com.krish.jaatplayer.jaat.updater.getUpdateNotificationsSetting
@@ -71,6 +73,7 @@ fun UpdateSettings(
 
     val context = LocalContext.current
     var autoUpdateEnabled by remember { mutableStateOf(getAutoUpdateCheckSetting(context)) }
+    var autoDownloadUpdateEnabled by remember { mutableStateOf(getAutoDownloadUpdateSetting(context)) }
     var updateNotificationsEnabled by remember { mutableStateOf(getUpdateNotificationsSetting(context)) }
     var betaUpdatesEnabled by remember { mutableStateOf(getBetaUpdatesSetting(context)) }
     val isUpdateAvailable = getUpdateAvailableState(context) && autoUpdateEnabled
@@ -164,6 +167,37 @@ fun UpdateSettings(
                         saveAutoUpdateCheckSetting(context, autoUpdateEnabled)
                         if (!autoUpdateEnabled) {
                             saveUpdateAvailableState(context, false)
+                        }
+                    }
+                ),
+
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.download),
+                    title = { Text("Auto-download updates") },
+                    description = { Text("Automatically download a new version in the background as soon as it's found, so it's ready to install") },
+                    trailingContent = {
+                        Switch(
+                            checked = autoDownloadUpdateEnabled,
+                            onCheckedChange = { enabled ->
+                                autoDownloadUpdateEnabled = enabled
+                                saveAutoDownloadUpdateSetting(context, enabled)
+                            },
+                            enabled = autoUpdateEnabled,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (autoDownloadUpdateEnabled) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = {
+                        if (autoUpdateEnabled) {
+                            autoDownloadUpdateEnabled = !autoDownloadUpdateEnabled
+                            saveAutoDownloadUpdateSetting(context, autoDownloadUpdateEnabled)
                         }
                     }
                 ),

@@ -560,6 +560,7 @@ fun UpdateScreen(navController: NavHostController) {
 
 const val PREFS_NAME = "settings"
 const val KEY_AUTO_UPDATE_CHECK = "auto_update_check"
+const val KEY_AUTO_DOWNLOAD_UPDATE = "auto_download_update"
 const val KEY_LAST_CHECKED_TIME = "last_checked_time"
 const val KEY_BETA_UPDATES = "beta_updates"
 const val KEY_UPDATE_AVAILABLE = "update_available"
@@ -583,6 +584,40 @@ fun saveAutoUpdateCheckSetting(context: Context, enabled: Boolean) {
     val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     sharedPrefs.edit().putBoolean(KEY_AUTO_UPDATE_CHECK, enabled).apply()
 }
+
+/**
+ * "Auto Update Check" only auto-*checks* for a new version and shows/notifies that
+ * one exists — it never actually started the download. This is the separate,
+ * previously-missing toggle for actually auto-downloading the APK in the
+ * background once a new version is found, so it's ready to install without the
+ * user having to open the update screen and tap Download themselves.
+ */
+fun getAutoDownloadUpdateSetting(context: Context): Boolean {
+    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    return sharedPrefs.getBoolean(KEY_AUTO_DOWNLOAD_UPDATE, false)
+}
+
+fun saveAutoDownloadUpdateSetting(context: Context, enabled: Boolean) {
+    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    sharedPrefs.edit().putBoolean(KEY_AUTO_DOWNLOAD_UPDATE, enabled).apply()
+}
+
+/**
+ * Enqueues the same [UpdateDownloadWorker] the manual "Update Available" button
+ * uses, so an auto-detected update finishes downloading in the background and is
+ * sitting ready to install by the time the user opens the app/update screen.
+ */
+fun enqueueAutoUpdateDownload(context: Context, version: String, size: String, apkUrl: String?) {
+    val urlToDownload = apkUrl
+        ?: "https://github.com/krishsreva1-lab/Jaat-Player/releases/download/$version/jaatplayer.apk"
+    val downloadRequest = androidx.work.OneTimeWorkRequestBuilder<UpdateDownloadWorker>()
+        .setInputData(androidx.work.workDataOf("apk_url" to urlToDownload, "version" to version, "file_size" to size))
+        .addTag("update_download")
+        .build()
+    androidx.work.WorkManager.getInstance(context)
+        .enqueueUniqueWork("update_download", androidx.work.ExistingWorkPolicy.KEEP, downloadRequest)
+}
+
 
 const val KEY_UPDATE_NOTIFICATIONS = "update_notifications"
 

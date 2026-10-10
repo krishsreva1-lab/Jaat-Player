@@ -128,15 +128,15 @@ highlightKey: String? = null) {
                     AboutActionRow(
                         icon = painterResource(R.drawable.website),
                         title = "Website",
-                        subtitle = "jaatplayerr.netlify.app",
-                        onClick = { uriHandler.openUri("https://jaatplayerr.netlify.app/") },
+                        subtitle = "jaatplayerr.web.app",
+                        onClick = { uriHandler.openUri("https://jaatplayerr.web.app/") },
                     )
                     AboutDivider()
                     AboutActionRow(
                         icon = painterResource(R.drawable.person),
                         title = "About Developer",
                         subtitle = "Know more about me",
-                        onClick = { uriHandler.openUri("https://jaatplayerr.netlify.app/") },
+                        onClick = { uriHandler.openUri("https://jaatplayerr.web.app/") },
                     )
                 }
             }

@@ -141,6 +141,8 @@ val AudioNormalizationKey = booleanPreferencesKey("audioNormalization")
 val AutoLoadMoreKey = booleanPreferencesKey("autoLoadMore")
 val DisableLoadMoreWhenRepeatAllKey = booleanPreferencesKey("disableLoadMoreWhenRepeatAll")
 val AutoDownloadOnLikeKey = booleanPreferencesKey("autoDownloadOnLike")
+/** Shows a floating "Dynamic Island" style pill over other apps while music plays and this app is backgrounded. Needs the SYSTEM_ALERT_WINDOW overlay permission. */
+val DynamicIslandEnabledKey = booleanPreferencesKey("dynamicIslandEnabled")
 val SimilarContent = booleanPreferencesKey("similarContent")
 val AutoSkipNextOnErrorKey = booleanPreferencesKey("autoSkipNextOnError")
 val StopMusicOnTaskClearKey = booleanPreferencesKey("stopMusicOnTaskClear")
@@ -827,12 +829,14 @@ val LiquidGlassQualityMenuEnabledKey = booleanPreferencesKey("liquidGlassQuality
 val LiquidGlassSpeakerMenuEnabledKey = booleanPreferencesKey("liquidGlassSpeakerMenuEnabled")
 val LiquidGlassSpeedMenuEnabledKey = booleanPreferencesKey("liquidGlassSpeedMenuEnabled")
 val LiquidGlassSleepTimerMenuEnabledKey = booleanPreferencesKey("liquidGlassSleepTimerMenuEnabled")
+val LiquidGlassSettingsMenuEnabledKey = booleanPreferencesKey("liquidGlassSettingsMenuEnabled")
 
 // Dedicated customization for Liquid Glass menus/dock only (separate from Player/MiniPlayer/NavBar).
 val LiquidGlassMenuBlurRadiusKey = floatPreferencesKey("liquidGlassMenuBlurRadius")
 val LiquidGlassMenuVibrancyKey = floatPreferencesKey("liquidGlassMenuVibrancy")
 val LiquidGlassMenuLensHeightKey = floatPreferencesKey("liquidGlassMenuLensHeight")
 val LiquidGlassMenuLensAmountKey = floatPreferencesKey("liquidGlassMenuLensAmount")
+val LiquidGlassAnimationStyleKey = stringPreferencesKey("liquidGlassAnimationStyle") // "capsule", "fade", "escape"
 val LiquidGlassAdoptThemeColorKey = booleanPreferencesKey("liquidGlassAdoptThemeColor")
 val UseFloatingNavBarKey = booleanPreferencesKey("useFloatingNavBar")
 
@@ -841,6 +845,9 @@ val JaatStylesEnabledKey = booleanPreferencesKey("jaatStylesEnabled")
 val JaatStylesModeKey = stringPreferencesKey("jaatStylesMode")
 val JaatStylesIntensityKey = floatPreferencesKey("jaatStylesIntensity")
 val JaatStylesBassSubModeKey = stringPreferencesKey("jaatStylesBassSubMode")
+val JaatStylesManualPositionEnabledKey = booleanPreferencesKey("jaatStylesManualPositionEnabled")
+val JaatStylesManualPanKey = floatPreferencesKey("jaatStylesManualPan")
+val JaatStylesManualDepthKey = floatPreferencesKey("jaatStylesManualDepth")
 val JaatStylesDebugOverlayKey = booleanPreferencesKey("jaatStylesDebugOverlay")
 
 enum class JaatStyleMode {

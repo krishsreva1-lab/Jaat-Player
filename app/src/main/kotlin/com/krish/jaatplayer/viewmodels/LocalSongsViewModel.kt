@@ -18,15 +18,21 @@ import com.krish.jaatplayer.localmedia.LocalSongScanner
 import com.krish.jaatplayer.utils.reportException
 import javax.inject.Inject
 
+import com.krish.jaatplayer.localmedia.LocalMetadataEnricher
+
 @HiltViewModel
 class LocalSongsViewModel
 @Inject
 constructor(
     database: MusicDatabase,
     private val localSongScanner: LocalSongScanner,
+    private val metadataEnricher: LocalMetadataEnricher,
 ) : ViewModel() {
     private val _scanState = MutableStateFlow(LocalSongsScanState())
     val scanState = _scanState.asStateFlow()
+
+    private val _enrichState = MutableStateFlow(LocalMetadataEnrichState())
+    val enrichState = _enrichState.asStateFlow()
 
     val songs = database.localSongs().stateIn(
         viewModelScope,
@@ -55,10 +61,35 @@ constructor(
                 }
         }
     }
+
+    fun enrichMetadata() {
+        if (_enrichState.value.isEnriching) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _enrichState.value = LocalMetadataEnrichState(isEnriching = true, completed = 0, total = 0)
+            runCatching {
+                metadataEnricher.enrichAllLocalSongs { completed, total ->
+                    _enrichState.value = LocalMetadataEnrichState(isEnriching = true, completed = completed, total = total)
+                }
+            }.onSuccess { enrichedCount ->
+                _enrichState.value = LocalMetadataEnrichState(isEnriching = false, enrichedCount = enrichedCount)
+            }.onFailure { error ->
+                reportException(error)
+                _enrichState.value = LocalMetadataEnrichState(isEnriching = false, errorMessage = error.message)
+            }
+        }
+    }
 }
 
 data class LocalSongsScanState(
     val isScanning: Boolean = false,
     val lastSummary: LocalSongScanSummary? = null,
+    val errorMessage: String? = null,
+)
+
+data class LocalMetadataEnrichState(
+    val isEnriching: Boolean = false,
+    val completed: Int = 0,
+    val total: Int = 0,
+    val enrichedCount: Int = 0,
     val errorMessage: String? = null,
 )

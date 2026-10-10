@@ -22,6 +22,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -317,21 +319,13 @@ fun Queue(
         com.krish.jaatplayer.ui.component.isGlassSupported()
     val queueGlassEffectConfig = queueMenuGlassConfig.toGlassEffectConfig(globalEnabled = useQueueGlass)
 
-    BottomSheet(
-        state = state,
-        modifier = modifier,
-        background = {
-            if (useQueueGlass) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .liquidGlass(config = queueGlassEffectConfig, shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp))
-                )
-            } else {
-                Box(Modifier.fillMaxSize().background(Color.Unspecified))
-            }
-        },
-        collapsedContent = {
+    var showQueueGlassCard by remember { mutableStateOf(false) }
+
+    // Collapsed bar content and the full expanded queue UI, extracted into named values so
+    // both the default sliding BottomSheet (glass off) and the floating glass card (glass on)
+    // below can render the exact same content — nothing about the queue UI itself changed,
+    // only which container it's placed inside.
+    val queueCollapsedContent: @Composable BoxScope.() -> Unit = {
             if (useNewPlayerDesign) {
                 
                 Row(
@@ -362,7 +356,7 @@ fun Queue(
 
                     PlayerQueueButton(
                         icon = R.drawable.queue_music,
-                        onClick = { state.expandSoft() },
+                        onClick = { if (useQueueGlass) showQueueGlassCard = true else state.expandSoft() },
                         isActive = false,
                         shape = queueShape,
                         modifier = Modifier.size(buttonSize),
@@ -508,7 +502,7 @@ fun Queue(
                         ),
                 ) {
                     TextButton(
-                        onClick = { state.expandSoft() },
+                        onClick = { if (useQueueGlass) showQueueGlassCard = true else state.expandSoft() },
                         modifier = Modifier.wrapContentWidth()
                     ) {
                         Row(
@@ -635,8 +629,9 @@ fun Queue(
                     }
                 }
             }
-        },
-    ) {
+    }
+
+    val queueExpandedContent: @Composable BoxScope.() -> Unit = {
         val queueTitle by playerConnection.queueTitle.collectAsState()
         val queueWindows by playerConnection.queueWindows.collectAsState()
         val automix by playerConnection.service.automixItems.collectAsState()
@@ -721,7 +716,7 @@ fun Queue(
             modifier =
             Modifier
                 .fillMaxSize()
-                .background(background),
+                .background(if (useQueueGlass) Color.Transparent else background),
         ) {
             Column(
                 modifier =
@@ -1153,6 +1148,7 @@ fun Queue(
                                         isActive = isActive,
                                         isPlaying = isPlaying && isActive,
                                         shape = listItemShape(index, mutableQueueWindows.size),
+                                        color = if (useQueueGlass) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceContainer,
                                         trailingContent = {
                                             if (inSelectMode) {
                                                 Checkbox(
@@ -1202,7 +1198,7 @@ fun Queue(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .background(background)
+                                                .background(if (useQueueGlass) Color.Transparent else background)
                                                 .combinedClickable(
                                                     onClick = {
                                                         if (inSelectMode) {
@@ -1287,6 +1283,7 @@ fun Queue(
                                 MediaMetadataListItem(
                                     mediaMetadata = item.metadata!!,
                                     shape = listItemShape(index, automix.size),
+                                    color = if (useQueueGlass) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceContainer,
                                     trailingContent = {
                                         if (!isListenTogetherGuest) {
                                             IconButton(
@@ -1362,6 +1359,67 @@ fun Queue(
                 )
             }
         }
+    }
+
+    if (useQueueGlass) {
+        // Glass mode: the queue is a floating card — fades/scales in from the center like the
+        // Speed/Speaker/Sleep Timer/Equalizer glass menus — instead of a sheet that slides up
+        // from the bottom. The collapsed bar still sits at the bottom of the player screen with
+        // the same mini controls; tapping it opens the floating card below instead of
+        // BottomSheet's drag-to-expand animation.
+        //
+        // The old BottomSheet pinned the collapsed bar to the bottom via a fillMaxSize() box
+        // pushed down with a translationY transform (see BottomSheet.kt) — that's what made it
+        // sit at the bottom instead of wherever Compose's default top-start alignment would put
+        // it. A bare fillMaxWidth().height(...) box has none of that anchoring, so it needs its
+        // own fillMaxSize()+BottomCenter wrapper here to end up in the same place.
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(state.collapsedBound)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { showQueueGlassCard = true },
+                    )
+            ) {
+                queueCollapsedContent(this)
+            }
+        }
+
+        if (showQueueGlassCard) {
+            val queueCardShape = RoundedCornerShape(28.dp)
+            com.krish.jaatplayer.ui.component.PlayerGlassOverlay(
+                visible = showQueueGlassCard,
+                onDismissRequest = { showQueueGlassCard = false },
+                alignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.86f)
+                        .clip(queueCardShape)
+                        .liquidGlass(config = queueGlassEffectConfig, shape = queueCardShape)
+                ) {
+                    queueExpandedContent(this)
+                }
+            }
+        }
+    } else {
+        BottomSheet(
+            state = state,
+            modifier = modifier,
+            background = {
+                Box(Modifier.fillMaxSize().background(Color.Unspecified))
+            },
+            collapsedContent = queueCollapsedContent,
+            content = queueExpandedContent,
+        )
     }
 
     // Rendered here — as a direct sibling of BottomSheet(...), same as showCommentSheet below —

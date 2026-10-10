@@ -3,26 +3,39 @@ package com.krish.jaatplayer.eq.audio
 import androidx.media3.common.C
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.util.UnstableApi
-import com.krish.jaatplayer.constants.JaatBassSubMode
-import com.krish.jaatplayer.constants.JaatStyleMode
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.PI
-import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.pow
+import kotlin.math.floor
 import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
- * Real-time audio DSP processor implementing "Jaat Styles" FX:
- * - Adaptive Bass Drop: Operates strictly in the -8 dB to 0 dB range with a minimum 5-second hold timer.
- *   Sub-modes:
- *   - BEAT_ADAPTIVE: Beat/energy analysis with a minimum 5-second hold time on verse attenuation.
- *   - RANDOM_TIMER: Automatically toggles bass down (-8 dB) for at least 5+ seconds periodically without beat analysis.
- * - 8D Spatial Swirl: LFO-driven binaural panning and phase delay for 360° headphone spatial orbit.
- * - DJ Filter Sweep: Low-pass filter cutoff frequency sweep.
- * - Auto-Mashup FX: Rhythmic DJ Sidechain Chop & Filter Pump effect.
+ * Real-time audio DSP processor implementing the "Jaat Styles" 8D Spatial effect.
+ *
+ * The DJ Filter Sweep, Adaptive Bass Drop and Auto-Mashup modes have been removed
+ * (per request) — Adaptive Bass and the Mashup "chopper" never actually mixed
+ * multiple songs together (true multi-song mashup mixing needs a whole separate
+ * multi-track playback engine, not an AudioProcessor on a single stream), and DJ
+ * Filter Sweep was just a low-pass sweep. Only the 8D Spatial effect remains, and
+ * it's been rebuilt to be a *real* 8D effect instead of simple left-right panning:
+ *
+ * - ILD (interaural level difference): the existing left/right gain panning.
+ * - ITD (interaural time difference): a short, continuously variable delay line on
+ *   whichever ear is "far" from the sound's position — real ears hear a delayed
+ *   copy from the far side, not just a quieter one. This is most of what makes a
+ *   panned sound feel like it's actually moving *around* your head instead of just
+ *   sliding left-right inside it.
+ * - Front/back directional filtering: sounds coming from behind lose high
+ *   frequencies (your outer ear/head shadow filters them) and sounds in front stay
+ *   bright. Modulating a low-pass filter by the "depth" (front/back) position is
+ *   what sells the front-vs-behind illusion, since ILD/ITD alone only really
+ *   convey left/right.
+ *
+ * Position is either automatic (a slow LFO continuously orbits all the way around:
+ * left -> front -> right -> behind -> left again) or a manual override, set by
+ * [manualPan] (-1 = full left, +1 = full right) and [manualDepth] (-1 = fully
+ * behind, +1 = fully in front) when [manualPositionEnabled] is true.
  */
 @UnstableApi
 class JaatStylesAudioProcessor : AudioProcessor {
@@ -31,13 +44,19 @@ class JaatStylesAudioProcessor : AudioProcessor {
     var isStyleEnabled: Boolean = false
 
     @Volatile
-    var mode: JaatStyleMode = JaatStyleMode.BASS_DROP
-
-    @Volatile
-    var bassSubMode: JaatBassSubMode = JaatBassSubMode.BEAT_ADAPTIVE
-
-    @Volatile
     var intensity: Float = 0.7f
+
+    /** When true, [manualPan]/[manualDepth] are used instead of the auto-orbit LFO. */
+    @Volatile
+    var manualPositionEnabled: Boolean = false
+
+    /** -1f (full left) .. 0f (center) .. +1f (full right). */
+    @Volatile
+    var manualPan: Float = 0f
+
+    /** -1f (fully behind) .. 0f (beside) .. +1f (fully in front). */
+    @Volatile
+    var manualDepth: Float = 0f
 
     private var sampleRate = 0
     private var channelCount = 0
@@ -48,71 +67,46 @@ class JaatStylesAudioProcessor : AudioProcessor {
     private var outputBuffer: ByteBuffer = EMPTY_BUFFER
     private var inputEnded = false
 
-    // Adaptive Bass state
-    private var currentBassGainDb = 0.0
-    private var targetBassGainDb = 0.0
-    private var bassFilterL = 0.0
-    private var bassFilterR = 0.0
-    private var bassEnvelope = 0.0
-    private var longTermBassAvg = 0.05
-
-    // 5-second minimum hold timer
-    private var bassStateHoldSamples = 0L
-    private var randomTimerSamples = 0L
-    private var randomStateIsBassDown = false
-
-    // Biquad state for bass shelf
-    private var b0 = 1.0; private var b1 = 0.0; private var b2 = 0.0
-    private var a1 = 0.0; private var a2 = 0.0
-    private var x1L = 0.0; private var x2L = 0.0; private var y1L = 0.0; private var y2L = 0.0
-    private var x1R = 0.0; private var x2R = 0.0; private var y1R = 0.0; private var y2R = 0.0
-
-    // 8D Spatial Orbit LFO
+    // 8D Spatial Orbit LFO (used only when manualPositionEnabled == false)
     private var orbitPhase = 0.0
 
-    // DJ Filter Sweep LFO
-    private var sweepPhase = 0.0
-    private var filterL1 = 0.0
-    private var filterR1 = 0.0
+    // --- ITD delay lines (one per ear) ---
+    // Real human ITD tops out around ~660us. We exaggerate slightly (up to ~1.1ms)
+    // since headphone listeners find a subtler ITD hard to notice; still short
+    // enough to sound like a delay/position cue rather than an audible echo.
+    private var maxDelaySamplesF = 0.0
+    private var delayBufL: DoubleArray = DoubleArray(0)
+    private var delayBufR: DoubleArray = DoubleArray(0)
+    private var delayWriteIdx = 0
 
-    // Mashup DJ Chopper
-    private var mashupLFO = 0.0
-    private var mashupHPF_L = 0.0
-    private var mashupHPF_R = 0.0
+    // --- Front/back directional low-pass (one-pole) per ear ---
+    private var dirFilterL = 0.0
+    private var dirFilterR = 0.0
 
     data class JaatStylesDebugInfo(
         val isEnabled: Boolean,
-        val mode: JaatStyleMode,
-        val bassSubMode: JaatBassSubMode,
         val intensityPercent: Int,
-        val currentBassGainDb: Double,
-        val targetBassGainDb: Double,
-        val lowFreqEnergyEnvelope: Double,
-        val holdSecondsRemaining: Double,
+        val manualPositionEnabled: Boolean,
         val orbitAngleDeg: Int,
-        val filterCutoffHz: Int,
+        val panPercent: Int,
+        val depthPercent: Int,
     )
 
     fun getDebugInfo(): JaatStylesDebugInfo {
-        val holdSecs = if (sampleRate > 0) bassStateHoldSamples.toDouble() / sampleRate.toDouble() else 0.0
+        val (pan, depth) = currentPanDepth()
         return JaatStylesDebugInfo(
             isEnabled = isStyleEnabled,
-            mode = mode,
-            bassSubMode = bassSubMode,
             intensityPercent = (intensity * 100).toInt(),
-            currentBassGainDb = currentBassGainDb,
-            targetBassGainDb = targetBassGainDb,
-            lowFreqEnergyEnvelope = bassEnvelope,
-            holdSecondsRemaining = holdSecs,
+            manualPositionEnabled = manualPositionEnabled,
             orbitAngleDeg = ((orbitPhase * 180.0 / PI).toInt() % 360 + 360) % 360,
-            filterCutoffHz = (200 + (sin(sweepPhase) + 1.0) * 0.5 * 8000.0 * intensity).toInt(),
+            panPercent = (pan * 100).toInt(),
+            depthPercent = (depth * 100).toInt(),
         )
     }
 
     companion object {
         private val EMPTY_BUFFER: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
-        private const val SHELF_FREQ_HZ = 120.0
-        private const val MIN_HOLD_SECONDS = 5.0 // Minimum 5 seconds hold time for bass attenuation
+        private const val MAX_ITD_SECONDS = 0.0011 // ~1.1ms
     }
 
     override fun configure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
@@ -122,7 +116,11 @@ class JaatStylesAudioProcessor : AudioProcessor {
 
         if (encoding == C.ENCODING_PCM_16BIT && channelCount in 1..2 && sampleRate > 0) {
             isConfigured = true
-            updateShelfCoefficients(currentBassGainDb)
+            maxDelaySamplesF = MAX_ITD_SECONDS * sampleRate
+            val bufSize = maxDelaySamplesF.toInt() + 4
+            delayBufL = DoubleArray(bufSize)
+            delayBufR = DoubleArray(bufSize)
+            delayWriteIdx = 0
             return inputAudioFormat
         }
         isConfigured = false
@@ -158,7 +156,7 @@ class JaatStylesAudioProcessor : AudioProcessor {
             val sampleL = inputShorts.get()
             val sampleR = if (channelCount == 2) inputShorts.get() else sampleL
 
-            val processed = processSample(sampleL.toDouble(), sampleR.toDouble())
+            val processed = process8DSpatial(sampleL.toDouble(), sampleR.toDouble())
             this.inputBuffer.putShort(processed.first.toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort())
             if (channelCount == 2) {
                 this.inputBuffer.putShort(processed.second.toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort())
@@ -170,150 +168,71 @@ class JaatStylesAudioProcessor : AudioProcessor {
         this.outputBuffer = this.inputBuffer
     }
 
-    private fun processSample(l: Double, r: Double): Pair<Double, Double> {
-        return when (mode) {
-            JaatStyleMode.BASS_DROP -> processAdaptiveBass(l, r)
-            JaatStyleMode.SPATIAL_8D -> process8DSpatial(l, r)
-            JaatStyleMode.FILTER_SWEEP -> processFilterSweep(l, r)
-            JaatStyleMode.MASHUP -> processMashupEffect(l, r)
+    /** Returns the current (pan, depth), each in -1f..+1f. */
+    private fun currentPanDepth(): Pair<Double, Double> {
+        return if (manualPositionEnabled) {
+            manualPan.toDouble().coerceIn(-1.0, 1.0) to manualDepth.toDouble().coerceIn(-1.0, 1.0)
+        } else {
+            sin(orbitPhase) to cos(orbitPhase)
         }
-    }
-
-    private fun processAdaptiveBass(l: Double, r: Double): Pair<Double, Double> {
-        val minHoldSamples = (MIN_HOLD_SECONDS * sampleRate.toDouble()).toLong()
-
-        when (bassSubMode) {
-            JaatBassSubMode.BEAT_ADAPTIVE -> {
-                // Normalize PCM sample (-1.0 .. +1.0)
-                val normL = l / 32768.0
-                val normR = r / 32768.0
-
-                // Low-pass filter for sub-bass (<120Hz)
-                bassFilterL += 0.025 * (normL - bassFilterL)
-                bassFilterR += 0.025 * (normR - bassFilterR)
-                val bassAbs = abs((bassFilterL + bassFilterR) * 0.5)
-
-                // Envelope follower
-                if (bassAbs > bassEnvelope) {
-                    bassEnvelope += 0.005 * (bassAbs - bassEnvelope)
-                } else {
-                    bassEnvelope *= 0.99992
-                }
-
-                // Long-term average
-                longTermBassAvg = longTermBassAvg * 0.99998 + bassAbs * 0.00002
-
-                val dropThreshold = (longTermBassAvg * (1.15 - intensity * 0.35)).coerceAtLeast(0.02)
-                val isBeatDrop = bassEnvelope > dropThreshold
-
-                if (bassStateHoldSamples > 0) {
-                    bassStateHoldSamples--
-                } else {
-                    val newTargetDb = if (isBeatDrop) 0.0 else -8.0 * intensity.toDouble()
-                    if (newTargetDb != targetBassGainDb) {
-                        targetBassGainDb = newTargetDb
-                        bassStateHoldSamples = minHoldSamples // Lock for AT LEAST 5 SECONDS!
-                    }
-                }
-            }
-
-            JaatBassSubMode.RANDOM_TIMER -> {
-                if (randomTimerSamples > 0) {
-                    randomTimerSamples--
-                    if (bassStateHoldSamples > 0) bassStateHoldSamples--
-                } else {
-                    randomStateIsBassDown = !randomStateIsBassDown
-                    targetBassGainDb = if (randomStateIsBassDown) -8.0 * intensity.toDouble() else 0.0
-                    // Random interval between 5.0 and 9.0 seconds
-                    val randomSecs = 5.0 + (Math.random() * 4.0)
-                    randomTimerSamples = (randomSecs * sampleRate.toDouble()).toLong()
-                    bassStateHoldSamples = (5.0 * sampleRate.toDouble()).toLong()
-                }
-            }
-        }
-
-        // Smooth per-sample gain transition
-        if (abs(currentBassGainDb - targetBassGainDb) > 0.01) {
-            currentBassGainDb += (targetBassGainDb - currentBassGainDb) * 0.0003
-            updateShelfCoefficients(currentBassGainDb)
-        }
-
-        // Apply low-shelf filter
-        val outL = b0 * l + b1 * x1L + b2 * x2L - a1 * y1L - a2 * y2L
-        x2L = x1L; x1L = l; y2L = y1L; y1L = outL
-
-        val outR = b0 * r + b1 * x1R + b2 * x2R - a1 * y1R - a2 * y2R
-        x2R = x1R; x1R = r; y2R = y1R; y1R = outR
-
-        return Pair(outL, outR)
     }
 
     private fun process8DSpatial(l: Double, r: Double): Pair<Double, Double> {
-        val speed = 0.25 * (0.5 + intensity)
-        orbitPhase += (2.0 * PI * speed) / sampleRate
-        if (orbitPhase > 2.0 * PI) orbitPhase -= 2.0 * PI
+        if (!manualPositionEnabled) {
+            val speed = 0.12 * (0.5 + intensity) // full 360 deg loop every ~10-20s
+            orbitPhase += (2.0 * PI * speed) / sampleRate
+            if (orbitPhase > 2.0 * PI) orbitPhase -= 2.0 * PI
+        }
+        val (pan, depth) = currentPanDepth() // pan: -1 left..+1 right, depth: -1 behind..+1 front
 
-        val pan = sin(orbitPhase) // -1.0 .. +1.0
-        val gainL = cos((pan + 1.0) * (PI / 4.0))
-        val gainR = sin((pan + 1.0) * (PI / 4.0))
+        // --- ILD: equal-power left/right gain with minimum opposite ear bleed ---
+        // Scale pan to -0.68..+0.68 so the far-side ear drops to ~-12dB (~25% gain) instead of complete silence
+        val effectivePan = pan * 0.68
+        val gainL = cos((effectivePan + 1.0) * (PI / 4.0))
+        val gainR = sin((effectivePan + 1.0) * (PI / 4.0))
 
-        return Pair(l * gainL, r * gainR)
-    }
+        // --- ITD: delay whichever ear is "far side" from the pan position ---
+        // pan > 0 (source right) -> left ear is far -> left is delayed.
+        // pan < 0 (source left)  -> right ear is far -> right is delayed.
+        val delayLSamples = maxDelaySamplesF * (if (pan > 0) pan else 0.0)
+        val delayRSamples = maxDelaySamplesF * (if (pan < 0) -pan else 0.0)
 
-    private fun processFilterSweep(l: Double, r: Double): Pair<Double, Double> {
-        val speed = 0.15 * (0.5 + intensity)
-        sweepPhase += (2.0 * PI * speed) / sampleRate
-        if (sweepPhase > 2.0 * PI) sweepPhase -= 2.0 * PI
+        val bufSize = delayBufL.size
+        delayBufL[delayWriteIdx] = l
+        delayBufR[delayWriteIdx] = r
 
-        val sweepAmount = (sin(sweepPhase) + 1.0) * 0.5 // 0.0 .. 1.0
-        val alpha = 0.05 + sweepAmount * 0.85 * intensity
+        val delayedL = readDelayed(delayBufL, delayWriteIdx, delayLSamples, bufSize)
+        val delayedR = readDelayed(delayBufR, delayWriteIdx, delayRSamples, bufSize)
 
-        filterL1 += alpha * (l - filterL1)
-        filterR1 += alpha * (r - filterR1)
+        delayWriteIdx = (delayWriteIdx + 1) % bufSize
 
-        return Pair(filterL1, filterR1)
-    }
+        // --- Front/back directional low-pass: duller when behind (depth < 0) ---
+        // depth ranges -1..+1; map to a filter coefficient so "front" is fully
+        // open (bright, alpha=1 i.e. no filtering) and "behind" rolls off highs.
+        val behindAmount = ((-depth + 1.0) * 0.5).coerceIn(0.0, 1.0) // 0 front .. 1 behind
+        val alpha = (1.0 - behindAmount * 0.75 * intensity).coerceIn(0.15, 1.0)
+        dirFilterL += alpha * (delayedL - dirFilterL)
+        dirFilterR += alpha * (delayedR - dirFilterR)
 
-    private fun processMashupEffect(l: Double, r: Double): Pair<Double, Double> {
-        // Rhythmic DJ Sidechain Chopper & Filter Pump Effect
-        val bpmHz = 2.1 * (0.8 + intensity * 0.6)
-        mashupLFO += (2.0 * PI * bpmHz) / sampleRate
-        if (mashupLFO > 2.0 * PI) mashupLFO -= 2.0 * PI
+        // A touch of extra attenuation when fully behind, like sound wrapping
+        // around the head, so front/back isn't only a tone-color change.
+        val distanceAtten = 1.0 - behindAmount * 0.12 * intensity
 
-        val phase = mashupLFO / (2.0 * PI)
-        val sidechainDuck = (0.2 + 0.8 * sin(phase * PI)).coerceIn(0.1, 1.0)
-
-        val alphaHP = if (phase > 0.5) 0.1 else 0.95
-        mashupHPF_L += alphaHP * (l - mashupHPF_L)
-        mashupHPF_R += alphaHP * (r - mashupHPF_R)
-
-        val outL = (l * (1.0 - alphaHP) + (l - mashupHPF_L) * alphaHP) * sidechainDuck
-        val outR = (r * (1.0 - alphaHP) + (r - mashupHPF_R) * alphaHP) * sidechainDuck
+        val outL = dirFilterL * gainL * distanceAtten
+        val outR = dirFilterR * gainR * distanceAtten
 
         return Pair(outL, outR)
     }
 
-    private fun updateShelfCoefficients(gainDb: Double) {
-        val clampedGain = gainDb.coerceIn(-12.0, 0.0) // Strictly negative/zero, no positive boost
-        val A = sqrt(10.0.pow(clampedGain / 20.0))
-        val omega = 2.0 * PI * SHELF_FREQ_HZ / sampleRate
-        val sinOmega = sin(omega)
-        val cosOmega = cos(omega)
-        val alpha = sinOmega / 2.0 * sqrt(2.0)
-        val sqrtA = sqrt(A)
-        val aPlusOne = A + 1.0
-        val aMinusOne = A - 1.0
-        val twoSqrtAAlpha = 2.0 * sqrtA * alpha
-
-        var rb0 = A * (aPlusOne - aMinusOne * cosOmega + twoSqrtAAlpha)
-        var rb1 = 2.0 * A * (aMinusOne - aPlusOne * cosOmega)
-        var rb2 = A * (aPlusOne - aMinusOne * cosOmega - twoSqrtAAlpha)
-        val ra0 = aPlusOne + aMinusOne * cosOmega + twoSqrtAAlpha
-        var ra1 = -2.0 * (aMinusOne + aPlusOne * cosOmega)
-        var ra2 = aPlusOne + aMinusOne * cosOmega - twoSqrtAAlpha
-
-        rb0 /= ra0; rb1 /= ra0; rb2 /= ra0; ra1 /= ra0; ra2 /= ra0
-        b0 = rb0; b1 = rb1; b2 = rb2; a1 = ra1; a2 = ra2
+    /** Fractional-delay read (linear interpolation) from a circular buffer. */
+    private fun readDelayed(buf: DoubleArray, writeIdx: Int, delaySamples: Double, size: Int): Double {
+        if (delaySamples <= 0.0) return buf[writeIdx]
+        val exactPos = writeIdx - delaySamples
+        val floorPos = floor(exactPos)
+        val frac = exactPos - floorPos
+        val i0 = (((floorPos.toInt() % size) + size) % size)
+        val i1 = (i0 + 1) % size
+        return buf[i0] * (1.0 - frac) + buf[i1] * frac
     }
 
     override fun queueEndOfStream() {
@@ -331,8 +250,10 @@ class JaatStylesAudioProcessor : AudioProcessor {
     override fun flush() {
         outputBuffer = EMPTY_BUFFER
         inputEnded = false
-        x1L = 0.0; x2L = 0.0; y1L = 0.0; y2L = 0.0
-        x1R = 0.0; x2R = 0.0; y1R = 0.0; y2R = 0.0
+        dirFilterL = 0.0
+        dirFilterR = 0.0
+        delayBufL.fill(0.0)
+        delayBufR.fill(0.0)
     }
 
     override fun reset() {

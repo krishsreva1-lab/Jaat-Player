@@ -91,6 +91,9 @@ import com.krish.jaatplayer.constants.JaatStylesEnabledKey
 import com.krish.jaatplayer.constants.JaatStylesModeKey
 import com.krish.jaatplayer.constants.JaatStylesIntensityKey
 import com.krish.jaatplayer.constants.JaatStylesBassSubModeKey
+import com.krish.jaatplayer.constants.JaatStylesManualPositionEnabledKey
+import com.krish.jaatplayer.constants.JaatStylesManualPanKey
+import com.krish.jaatplayer.constants.JaatStylesManualDepthKey
 import com.krish.jaatplayer.constants.JaatStyleMode
 import com.krish.jaatplayer.constants.JaatBassSubMode
 import android.os.Handler
@@ -250,6 +253,9 @@ class MusicService :
 
     @Inject
     lateinit var reverb3DService: com.krish.jaatplayer.eq.Reverb3DService
+
+    @Inject
+    lateinit var vocalRemoverService: com.krish.jaatplayer.eq.VocalRemoverService
 
     @Inject
     lateinit var eqProfileRepository: EQProfileRepository
@@ -433,6 +439,7 @@ class MusicService :
     lateinit var downloadCache: SimpleCache
 
     lateinit var player: ExoPlayer
+    private var dynamicIslandManager: DynamicIslandManager? = null
         private set
     private var secondaryPlayer: ExoPlayer? = null
     private var fadingPlayer: ExoPlayer? = null
@@ -452,7 +459,42 @@ class MusicService :
 
     private val playerSilenceProcessors = HashMap<Player, SilenceDetectorAudioProcessor>()
     private val playerDuckProcessors = HashMap<Player, AutomixDuckAudioProcessor>()
-    val jaatStylesProcessor = com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor()
+    // One JaatStylesAudioProcessor PER ExoPlayer. It used to be a single instance shared by
+    // every player, but a crossfade/automix transition runs two ExoPlayers at the same time
+    // (fading-out + incoming, plus a prebuffered one). The processor is stateful (delay lines,
+    // filter state, output buffer) and each player drives it from its own audio thread, so a
+    // shared instance got configure()/flush()ed by the incoming player while the outgoing one
+    // was still playing through it, and both threads overwrote each other's output buffer.
+    // Result: the blend broke (glitching/dropped audio, wrong track level) in crossfade/automix.
+    private val playerJaatStylesProcessors =
+        java.util.concurrent.ConcurrentHashMap<Player, com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor>()
+    private val jaatStylesProcessors =
+        java.util.concurrent.CopyOnWriteArrayList<com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor>()
+    private data class JaatStylesConfig(
+        val enabled: Boolean = false,
+        val intensity: Float = 0.7f,
+        val manualEnabled: Boolean = false,
+        val manualPan: Float = 0f,
+        val manualDepth: Float = 0f,
+    )
+    @Volatile
+    private var jaatStylesConfig = JaatStylesConfig()
+
+    private fun applyJaatStylesConfig(
+        processor: com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor,
+        config: JaatStylesConfig = jaatStylesConfig,
+    ) {
+        processor.isStyleEnabled = config.enabled
+        processor.intensity = config.intensity
+        processor.manualPositionEnabled = config.manualEnabled
+        processor.manualPan = config.manualPan
+        processor.manualDepth = config.manualDepth
+    }
+
+    private fun releaseJaatStylesProcessor(player: Player?) {
+        if (player == null) return
+        playerJaatStylesProcessors.remove(player)?.let { jaatStylesProcessors.remove(it) }
+    }
     val jaatStylesDebugInfo = MutableStateFlow<com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor.JaatStylesDebugInfo?>(null)
 
 
@@ -482,6 +524,18 @@ class MusicService :
     private var cachedPreloadEnabled: Boolean = true
     private var cachedPreloadLimit: Int = 1
     private var cachedPreloadLyrics: Boolean = true
+    // Mirrors of the SkipSilence/AudioOffload prefs, kept in sync by a plain Flow collector
+    // (see onCreate) so createExoPlayer() never has to block the thread it's called on to
+    // read them. It used to runBlocking { dataStore.get(...) } right inside createExoPlayer(),
+    // which is fine the one time it happens at app startup, but that function is also called
+    // to build the secondary player for a crossfade/automix transition - right on the Main
+    // dispatcher, right at the transition trigger. A runBlocking disk read there froze the UI
+    // (the progress bar/timer stalls) for however long that read took, while the actual audio
+    // kept playing underneath on ExoPlayer's own internal thread - exactly the "timer freezes,
+    // player looks paused but you can still hear it, then it stutters" symptom.
+    private var cachedSkipSilenceEnabled: Boolean = false
+    private var cachedSkipSilenceInstant: Boolean = false
+    private var cachedAudioOffloadPref: Boolean = false
 
     val automixItems = MutableStateFlow<List<MediaItem>>(emptyList())
 
@@ -654,6 +708,9 @@ class MusicService :
         player.addListener(sleepTimer)
         playerInitialized.value = true
         Timber.tag(TAG).d("Player successfully initialized")
+
+        dynamicIslandManager = DynamicIslandManager(this)
+        dynamicIslandManager?.attach()
 
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         abandonAudioFocus()
@@ -998,27 +1055,40 @@ class MusicService :
             .distinctUntilChanged()
             .collect(scope) { cachedPreloadLyrics = it }
 
+        // Non-blocking mirrors used by createExoPlayer() - see the fields' comment above.
+        dataStore.data
+            .map { (it[SkipSilenceKey] ?: false) to (it[SkipSilenceInstantKey] ?: false) }
+            .distinctUntilChanged()
+            .collect(scope) { (skipSilence, instantSkip) ->
+                cachedSkipSilenceEnabled = skipSilence
+                cachedSkipSilenceInstant = instantSkip
+            }
+
+        dataStore.data
+            .map { it[AudioOffload] ?: false }
+            .distinctUntilChanged()
+            .collect(scope) { cachedAudioOffloadPref = it }
+
         combine(
             dataStore.data.map { it[JaatStylesEnabledKey] ?: false },
-            dataStore.data.map { it[JaatStylesModeKey] ?: "BASS_DROP" },
             dataStore.data.map { it[JaatStylesIntensityKey] ?: 0.7f },
-            dataStore.data.map { it[JaatStylesBassSubModeKey] ?: "BEAT_ADAPTIVE" }
-        ) { enabled, modeStr, intensity, subModeStr ->
-            data class Config(val enabled: Boolean, val modeStr: String, val intensity: Float, val subModeStr: String)
-            Config(enabled, modeStr, intensity, subModeStr)
+            dataStore.data.map { it[JaatStylesManualPositionEnabledKey] ?: false },
+            dataStore.data.map { it[JaatStylesManualPanKey] ?: 0f },
+            dataStore.data.map { it[JaatStylesManualDepthKey] ?: 0f },
+        ) { enabled, intensity, manualEnabled, manualPan, manualDepth ->
+            JaatStylesConfig(enabled, intensity, manualEnabled, manualPan, manualDepth)
         }
             .distinctUntilChanged()
             .collect(scope) { config ->
-                jaatStylesProcessor.isStyleEnabled = config.enabled
-                jaatStylesProcessor.mode = runCatching { JaatStyleMode.valueOf(config.modeStr) }.getOrDefault(JaatStyleMode.BASS_DROP)
-                jaatStylesProcessor.intensity = config.intensity
-                jaatStylesProcessor.bassSubMode = runCatching { JaatBassSubMode.valueOf(config.subModeStr) }.getOrDefault(JaatBassSubMode.BEAT_ADAPTIVE)
+                jaatStylesConfig = config
+                jaatStylesProcessors.forEach { applyJaatStylesConfig(it, config) }
             }
 
         scope.launch {
             while (isActive) {
-                if (jaatStylesProcessor.isStyleEnabled) {
-                    jaatStylesDebugInfo.value = jaatStylesProcessor.getDebugInfo()
+                val activeStyles = playerJaatStylesProcessors[player]
+                if (activeStyles != null && activeStyles.isStyleEnabled) {
+                    jaatStylesDebugInfo.value = activeStyles.getDebugInfo()
                 } else {
                     jaatStylesDebugInfo.value = null
                 }
@@ -1142,17 +1212,18 @@ class MusicService :
         val duckProcessor = AutomixDuckAudioProcessor()
 
         val silenceProcessor = SilenceDetectorAudioProcessor { handleLongSilenceDetected() }
+        silenceProcessor.instantModeEnabled = cachedSkipSilenceEnabled && cachedSkipSilenceInstant
 
-        
-        runBlocking {
-            val skipSilence = dataStore.get(SkipSilenceKey, false)
-            val instantSkip = dataStore.get(SkipSilenceInstantKey, false)
-            silenceProcessor.instantModeEnabled = skipSilence && instantSkip
-        }
+        val vocalRemoverProcessor = com.krish.jaatplayer.eq.audio.VocalRemoverAudioProcessor()
+        vocalRemoverService.addAudioProcessor(vocalRemoverProcessor)
+
+        val jaatStylesProcessor = com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor()
+        applyJaatStylesConfig(jaatStylesProcessor)
+        jaatStylesProcessors.add(jaatStylesProcessor)
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(createMediaSourceFactory())
-            .setRenderersFactory(createRenderersFactory(eqProcessor, reverbProcessor, silenceProcessor, duckProcessor, jaatStylesProcessor))
+            .setRenderersFactory(createRenderersFactory(eqProcessor, reverbProcessor, silenceProcessor, duckProcessor, jaatStylesProcessor, vocalRemoverProcessor))
             .setLoadControl(
                 DefaultLoadControl.Builder()
                     .setBufferDurationsMs(50_000, 50_000, 750, 2_000)
@@ -1174,14 +1245,11 @@ class MusicService :
 
         playerSilenceProcessors[player] = silenceProcessor
         playerDuckProcessors[player] = duckProcessor
+        playerJaatStylesProcessors[player] = jaatStylesProcessor
 
         player.apply {
-                runBlocking {
-                    val offload = dataStore.get(AudioOffload, false)
-                    val crossfade = dataStore.get(CrossfadeEnabledKey, false)
-                    setOffloadEnabled(if (crossfade) false else offload)
-                    skipSilenceEnabled = dataStore.get(SkipSilenceKey, false)
-                }
+                setOffloadEnabled(if (crossfadeEnabled) false else cachedAudioOffloadPref)
+                skipSilenceEnabled = cachedSkipSilenceEnabled
                 addAnalyticsListener(PlaybackStatsListener(false, this@MusicService))
 
                 
@@ -1924,23 +1992,32 @@ class MusicService :
                 database.query {
                     update(song)
                     syncUtils.likeSong(song)
+                }
 
-                    
-                    if (dataStore.get(AutoDownloadOnLikeKey, false) && song.liked) {
-                        
-                        val downloadRequest =
-                            androidx.media3.exoplayer.offline.DownloadRequest
-                                .Builder(song.id, song.id.toUri())
-                                .setCustomCacheKey(song.id)
-                                .setData(song.title.toByteArray())
-                                .build()
-                        androidx.media3.exoplayer.offline.DownloadService.sendAddDownload(
-                            this@MusicService,
-                            ExoDownloadService::class.java,
-                            downloadRequest,
-                            false
-                        )
+                // Auto-download must run outside database.query { ... }: that block is
+                // fire-and-forget on Room's background query executor, so the download
+                // dispatch used to race the coroutine finishing (and, on a fresh/never-
+                // played song, the DB row for it might not exist yet, since only the
+                // player itself — not toggleLike() — normally inserts it). Mirror the
+                // exact steps the working manual Download button uses: insert the song's
+                // full metadata first (a no-op if it's already there), then build and
+                // send the same DownloadRequest.
+                if (dataStore.get(AutoDownloadOnLikeKey, false) && song.liked) {
+                    currentMediaMetadata.value?.let { metadata ->
+                        database.transaction { insert(metadata) }
                     }
+                    val downloadRequest =
+                        androidx.media3.exoplayer.offline.DownloadRequest
+                            .Builder(song.id, song.id.toUri())
+                            .setCustomCacheKey(song.id)
+                            .setData(song.title.toByteArray())
+                            .build()
+                    androidx.media3.exoplayer.offline.DownloadService.sendAddDownload(
+                        this@MusicService,
+                        ExoDownloadService::class.java,
+                        downloadRequest,
+                        false
+                    )
                 }
                 currentMediaMetadata.value = player.currentMetadata
             }
@@ -2073,6 +2150,7 @@ class MusicService :
         // Stale plan belongs to the previous track; planner re-arms when the new one is READY.
         if (!isCrossfading.value) automixDebugInfo.value = null
         prepareAutomixForCurrentPair()
+        dynamicIslandManager?.onTrackChanged()
 
         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
             if (cachedRepeatMode == REPEAT_MODE_ONE &&
@@ -2149,6 +2227,10 @@ class MusicService :
         if (dataStore.get(PersistentQueueKey, true)) {
             saveQueueToDisk()
         }
+    }
+
+    override fun onIsPlayingChanged(isPlaying: Boolean) {
+        dynamicIslandManager?.refresh()
     }
 
     override fun onPlaybackStateChanged(
@@ -3207,6 +3289,7 @@ class MusicService :
         silenceProcessor: SilenceDetectorAudioProcessor,
         duckProcessor: AutomixDuckAudioProcessor,
         jaatStylesProcessor: com.krish.jaatplayer.eq.audio.JaatStylesAudioProcessor,
+        vocalRemoverProcessor: com.krish.jaatplayer.eq.audio.VocalRemoverAudioProcessor,
     ) =
         object : DefaultRenderersFactory(this) {
             override fun buildAudioSink(
@@ -3222,6 +3305,7 @@ class MusicService :
 
                         arrayOf(
                             eqProcessor,
+                            vocalRemoverProcessor,
                             reverbProcessor,
                             jaatStylesProcessor,
                             duckProcessor,
@@ -3351,6 +3435,8 @@ class MusicService :
     override fun onDestroy() {
         isRunning = false
         releasePrebuffered()
+        dynamicIslandManager?.release()
+        dynamicIslandManager = null
 
         try {
             unregisterReceiver(screenStateReceiver)
@@ -3378,7 +3464,7 @@ class MusicService :
         player.removeListener(this)
         player.removeListener(sleepTimer)
         playerSilenceProcessors.remove(player)
-        
+        releaseJaatStylesProcessor(player)
         
         
         player.release()
@@ -3912,6 +3998,7 @@ class MusicService :
         prebuffered = null
         playerDuckProcessors.remove(pb.player)
         playerSilenceProcessors.remove(pb.player)
+        releaseJaatStylesProcessor(pb.player)
         try {
             pb.player.removeListener(secondaryPlayerListener)
             pb.player.stop()
@@ -3964,8 +4051,17 @@ class MusicService :
     private fun startCrossfade(plan: AutomixPlan? = null) {
         if (isCrossfading.value) return
 
-        val savedRepeatMode = runBlocking { dataStore.get(RepeatModeKey, REPEAT_MODE_OFF) }
-        val savedShuffleEnabled = runBlocking { dataStore.get(ShuffleModeKey, false) }
+        // These used to be `runBlocking { dataStore.get(...) }`, which blocks whatever
+        // thread this coroutine is running on (the same one driving player playback/UI)
+        // for however long the DataStore read takes — right at the exact moment the
+        // crossfade is meant to start. That's what caused the visible hitch/lag and the
+        // "pauses for a moment" feel right as a transition begins: the fade's very first
+        // frames were built *after* a synchronous stall instead of smoothly. A plain
+        // suspending read here does the same lookup without blocking the thread.
+        // Same in-memory mirrors prebufferSecondaryPlayer() uses: no disk read, no suspension
+        // point between the isCrossfading check above and the player swap below.
+        val savedRepeatMode = cachedRepeatMode
+        val savedShuffleEnabled = cachedShuffleEnabled
 
         val targetIndex = if (savedRepeatMode == REPEAT_MODE_ONE) {
             player.currentMediaItemIndex
@@ -4200,6 +4296,7 @@ class MusicService :
             fadingLoudnessEnhancer = null
         }
         fadingPlayer?.let { playerDuckProcessors.remove(it) }
+        fadingPlayer?.let { releaseJaatStylesProcessor(it) }
         fadingPlayer?.stop()
         fadingPlayer?.clearMediaItems()
         fadingPlayer?.release()

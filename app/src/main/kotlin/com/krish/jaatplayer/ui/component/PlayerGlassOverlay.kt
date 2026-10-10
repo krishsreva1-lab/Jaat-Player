@@ -2,11 +2,18 @@ package com.krish.jaatplayer.ui.component
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -37,6 +44,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.krish.jaatplayer.constants.LiquidGlassAnimationStyleKey
+import com.krish.jaatplayer.utils.rememberPreference
+
+/**
+ * Visibility state for glass menus. It always starts as "hidden" and only then flips to
+ * [visible], so an AnimatedVisibility driven by it really plays its ENTER animation on the
+ * first frame (a plain `visible = true` on first composition is shown instantly, with no
+ * animation — which is why the glass menus used to just pop in).
+ */
+@Composable
+fun rememberGlassVisibleState(visible: Boolean): MutableTransitionState<Boolean> {
+    val state = remember { MutableTransitionState(false) }
+    state.targetState = visible
+    return state
+}
+
+/** Enter transition for the style picked in Settings > Liquid Glass Effect: capsule / fade / escape. */
+fun glassEnterTransition(style: String, bottom: Boolean = false): EnterTransition = when (style) {
+    "fade" -> fadeIn(animationSpec = tween(260))
+    "escape" -> slideInVertically(
+        initialOffsetY = { if (bottom) it / 6 else it / 10 },
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+    ) + scaleIn(
+        initialScale = 0.65f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+    ) + fadeIn(animationSpec = tween(260))
+    else -> scaleIn(
+        initialScale = 0.22f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+    ) + fadeIn(animationSpec = tween(280))
+}
+
+fun glassExitTransition(style: String, bottom: Boolean = false): ExitTransition = when (style) {
+    "fade" -> fadeOut(animationSpec = tween(200))
+    "escape" -> slideOutVertically(
+        targetOffsetY = { (if (bottom) it / 6 else it / 10) / 2 },
+        animationSpec = tween(200)
+    ) + scaleOut(targetScale = 0.65f, animationSpec = tween(200)) + fadeOut(animationSpec = tween(180))
+    else -> scaleOut(targetScale = 0.20f, animationSpec = tween(220)) + fadeOut(animationSpec = tween(180))
+}
+
 
 /**
  * Same-window replacement for `Dialog()` / `AlertDialog()` / `ModalBottomSheet()` for
@@ -57,12 +105,15 @@ import androidx.compose.ui.unit.dp
  * instead of a stale capture.
  *
  * [visible] drives the enter/exit animation. The overlay keeps composing [content] for
- * the duration of the exit animation (so it can animate out) via an internal "active"
+ * the duration of the exit animation (so it can animate out) via an internal \"active\"
  * flag, then leaves the composition entirely once the exit finishes — it costs nothing
  * while hidden, same as the pattern it replaces.
  *
  * [alignment] controls where [content] sits within the overlay: [Alignment.Center] for
- * a dialog-style card, [Alignment.BottomCenter] for a bottom-sheet-style panel.
+ * a dialog-style card, [Alignment.BottomCenter] for a bottom-sheet-style panel. The
+ * enter/exit motion combines fade + scale + a short vertical slide (upward on enter for
+ * a center card, up-from-below for a bottom panel) so the transition reads as a single
+ * fluid gesture rather than a snap, matching the feel of the rest of the app's sheets.
  */
 @Composable
 fun PlayerGlassOverlay(
@@ -76,7 +127,17 @@ fun PlayerGlassOverlay(
 
     if (!isActive) return
 
+    val (animStyle) = rememberPreference(
+        key = LiquidGlassAnimationStyleKey,
+        defaultValue = "capsule"
+    )
+
     BackHandler(enabled = visible, onBack = onDismissRequest)
+
+    val isBottomAligned = alignment == Alignment.BottomCenter || alignment == Alignment.BottomStart || alignment == Alignment.BottomEnd
+    val enterTransition = glassEnterTransition(animStyle, isBottomAligned)
+    val exitTransition = glassExitTransition(animStyle, isBottomAligned)
+    val visibleState = rememberGlassVisibleState(visible)
 
     Box(
         modifier = Modifier
@@ -89,9 +150,9 @@ fun PlayerGlassOverlay(
         contentAlignment = alignment,
     ) {
         AnimatedVisibility(
-            visible = visible,
-            enter = scaleIn(initialScale = 0.9f, animationSpec = tween(220)) + fadeIn(animationSpec = tween(220)),
-            exit = scaleOut(targetScale = 0.9f, animationSpec = tween(180)) + fadeOut(animationSpec = tween(180)),
+            visibleState = visibleState,
+            enter = enterTransition,
+            exit = exitTransition,
         ) {
             DisposableEffect(Unit) {
                 onDispose { isActive = false }
@@ -142,7 +203,7 @@ fun PlayerGlassDialog(
         Surface(
             modifier = modifier
                 .padding(24.dp)
-                .widthIn(max = 320.dp)
+                .widthIn(max = 340.dp)
                 .let { mod ->
                     if (useGlass) {
                         mod.clip(dialogShape)

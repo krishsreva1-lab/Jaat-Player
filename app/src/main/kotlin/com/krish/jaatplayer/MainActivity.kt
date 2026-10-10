@@ -178,6 +178,8 @@ import com.krish.jaatplayer.constants.NavigationBarAnimationSpec
 import com.krish.jaatplayer.constants.NavigationBarHeight
 import com.krish.jaatplayer.jaat.updater.checkForUpdate
 import com.krish.jaatplayer.jaat.updater.getAutoUpdateCheckSetting
+import com.krish.jaatplayer.jaat.updater.getAutoDownloadUpdateSetting
+import com.krish.jaatplayer.jaat.updater.enqueueAutoUpdateDownload
 import com.krish.jaatplayer.jaat.updater.isNewerVersion
 import com.krish.jaatplayer.jaat.updater.saveUpdateAvailableState
 import com.krish.jaatplayer.jaat.updater.getUpdateNotificationsSetting
@@ -450,7 +452,7 @@ class MainActivity : ComponentActivity() {
                 delay(2000L)
                 checkForUpdate(
                     context = context,
-                    onSuccess = { latestVersion, isAvailable, _, _, _, _, _, _ ->
+                    onSuccess = { latestVersion, isAvailable, _, size, _, _, _, apkUrl ->
                         val currentVersion = BuildConfig.VERSION_NAME
                         Log.d("UpdateCheck", "Startup check success. Latest: $latestVersion, Current: $currentVersion, isAvailable: $isAvailable")
                         saveUpdateAvailableState(context, isAvailable)
@@ -458,6 +460,11 @@ class MainActivity : ComponentActivity() {
                         if (isAvailable && getUpdateNotificationsSetting(context)) {
                             Log.d("UpdateCheck", "Posting update notification for $latestVersion")
                             UpdateNotificationHelper.showUpdateNotification(context, latestVersion)
+                        }
+
+                        if (isAvailable && getAutoDownloadUpdateSetting(context)) {
+                            Log.d("UpdateCheck", "Auto-downloading update $latestVersion in the background")
+                            enqueueAutoUpdateDownload(context, latestVersion, size, apkUrl)
                         }
                     },
                     onError = {
@@ -981,12 +988,13 @@ class MainActivity : ComponentActivity() {
                 val (liquidGlassSpeedMenuEnabled) = rememberPreference(LiquidGlassSpeedMenuEnabledKey, defaultValue = false)
                 val (liquidGlassSleepTimerMenuEnabled) = rememberPreference(LiquidGlassSleepTimerMenuEnabledKey, defaultValue = false)
                 val (liquidGlassEqualizerMenuEnabled) = rememberPreference(LiquidGlassEqualizerMenuEnabledKey, defaultValue = true)
+                val (liquidGlassSettingsMenuEnabled) = rememberPreference(LiquidGlassSettingsMenuEnabledKey, defaultValue = false)
                 val menuGlassConfig = remember(
                     liquidGlassStyleStr, liquidGlassMenuBlurRadius, liquidGlassMenuVibrancy,
                     liquidGlassMenuLensHeight, liquidGlassMenuLensAmount, liquidGlassPlayerMenuEnabled,
                     liquidGlassQueueMenuEnabled, liquidGlassQualityMenuEnabled, liquidGlassSpeakerMenuEnabled,
                     liquidGlassSpeedMenuEnabled, liquidGlassSleepTimerMenuEnabled, liquidGlassEqualizerMenuEnabled,
-                    liquidGlassAdoptThemeColor,
+                    liquidGlassSettingsMenuEnabled, liquidGlassAdoptThemeColor,
                 ) {
                     MenuGlassConfig(
                         style = GlassStyle.fromPref(liquidGlassStyleStr),
@@ -1002,6 +1010,7 @@ class MainActivity : ComponentActivity() {
                         speedMenuEnabled = liquidGlassSpeedMenuEnabled,
                         sleepTimerMenuEnabled = liquidGlassSleepTimerMenuEnabled,
                         equalizerMenuEnabled = liquidGlassEqualizerMenuEnabled,
+                        settingsMenuEnabled = liquidGlassSettingsMenuEnabled,
                     )
                 }
 

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.krish.jaatplayer.ui.component.JaatLoadingIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -141,8 +143,8 @@ fun QueueMenu(
     if (showWhyDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showWhyDialog = false },
-            title = { androidx.compose.material3.Text(text = "Jaat Brain Recommendation") },
-            text = { androidx.compose.material3.Text(text = "This song was dynamically added by Jaat Brain based on your listening patterns, the current song's genre, and your library's vibes.") },
+            title = { Text(text = "Jaat Mind Recommendation") },
+            text = { Text(text = "This song was dynamically added by Jaat Mind based on your listening patterns, the current song's genre, and your library's vibes.") },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { showWhyDialog = false }) {
                     androidx.compose.material3.Text("Got it")
@@ -196,44 +198,50 @@ fun QueueMenu(
     }
 
     
-    MediaMetadataListItem(
-        mediaMetadata = mediaMetadata,
-        shape = MaterialTheme.shapes.large,
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        trailingContent = {
-            IconButton(
-                onClick = {
-                    coroutineScope.launch(Dispatchers.IO) {
-                        database.transaction {
-                            if (librarySong == null) {
-                                insert(mediaMetadata)
+    Material3MenuGroup(
+        items = listOf(
+            Material3MenuItemData(
+                customComposable = {
+                    MediaMetadataListItem(
+                        mediaMetadata = mediaMetadata,
+                        shape = RoundedCornerShape(24.dp),
+                        color = Color.Transparent,
+                        trailingContent = {
+                            IconButton(
+                                onClick = {
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        database.transaction {
+                                            if (librarySong == null) {
+                                                insert(mediaMetadata)
+                                            }
+                                        }
+                                        val song = database.song(mediaMetadata.id).firstOrNull()
+                                        song?.let {
+                                            val s = it.song.toggleLike()
+                                            database.query {
+                                                update(s)
+                                            }
+                                            syncUtils.likeSong(s)
+                                        }
+                                    }
+                                },
+                            ) {
+                                Icon(
+                                    painter = painterResource(
+                                        if (librarySong?.song?.liked == true) R.drawable.favorite
+                                        else R.drawable.favorite_border
+                                    ),
+                                    tint = if (librarySong?.song?.liked == true) MaterialTheme.colorScheme.error
+                                    else LocalContentColor.current,
+                                    contentDescription = null,
+                                )
                             }
-                        }
-                        val song = database.song(mediaMetadata.id).firstOrNull()
-                        song?.let {
-                            val s = it.song.toggleLike()
-                            database.query {
-                                update(s)
-                            }
-                            syncUtils.likeSong(s)
-                        }
-                    }
-                },
-            ) {
-                Icon(
-                    painter = painterResource(
-                        if (librarySong?.song?.liked == true) R.drawable.favorite
-                        else R.drawable.favorite_border
-                    ),
-                    tint = if (librarySong?.song?.liked == true) MaterialTheme.colorScheme.error
-                    else LocalContentColor.current,
-                    contentDescription = null,
-                )
-            }
-        },
+                        },
+                    )
+                }
+            )
+        )
     )
-
-    HorizontalDivider()
 
     Spacer(modifier = Modifier.height(12.dp))
 

@@ -199,6 +199,10 @@ highlightKey: String? = null) {
         AutoDownloadOnLikeKey,
         defaultValue = false
     )
+    val (dynamicIslandEnabled, onDynamicIslandEnabledChange) = rememberPreference(
+        com.krish.jaatplayer.constants.DynamicIslandEnabledKey,
+        defaultValue = false
+    )
     val (similarContentEnabled, similarContentEnabledChange) = rememberPreference(
         key = SimilarContent,
         defaultValue = true
@@ -610,8 +614,8 @@ highlightKey: String? = null) {
 
                     add(Material3SettingsItem(
                         icon = painterResource(R.drawable.bug_report),
-                        title = { Text("Jaat Styles Debug Overlay") },
-                        description = { Text("Show live Jaat Styles DSP metrics & status on player") },
+                        title = { Text("Jaat Spatial Debug Overlay") },
+                        description = { Text("Show live Jaat Spatial DSP metrics & status on player") },
                         trailingContent = {
                             Switch(
                                 checked = jaatStylesDebugOverlay,
@@ -955,6 +959,38 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { onAutoDownloadOnLikeChange(!autoDownloadOnLike) }
+                ),
+                Material3SettingsItem(
+                    icon = painterResource(R.drawable.music_note),
+                    title = { Text("Dynamic Island") },
+                    description = { Text("Show a floating player pill at the top of the screen when you leave the app while music is playing. Tap it to expand controls, swipe up to hide.") },
+                    trailingContent = {
+                        Switch(
+                            checked = dynamicIslandEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled && !android.provider.Settings.canDrawOverlays(context)) {
+                                    // Overlay permission can only be granted from system settings.
+                                    context.startActivity(
+                                        Intent(
+                                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:" + context.packageName)
+                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                                onDynamicIslandEnabledChange(enabled)
+                            },
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (dynamicIslandEnabled) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onDynamicIslandEnabledChange(!dynamicIslandEnabled) }
                 ),
                 Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.enable_similar_content)),

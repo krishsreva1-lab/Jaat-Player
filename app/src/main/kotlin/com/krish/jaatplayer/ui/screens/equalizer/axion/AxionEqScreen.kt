@@ -29,10 +29,16 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import android.content.Intent
+import android.media.audiofx.AudioEffect
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.krish.jaatplayer.LocalPlayerConnection
 import com.krish.jaatplayer.R
 import com.krish.jaatplayer.constants.JaatBassSubMode
 import com.krish.jaatplayer.constants.JaatStyleMode
 import com.krish.jaatplayer.eq.audio.Reverb3DPreset
+import com.krish.jaatplayer.eq.audio.VocalRemoverAudioProcessor
 import com.krish.jaatplayer.eq.data.SavedEQProfile
 import com.krish.jaatplayer.ui.component.Material3SettingsGroup
 import com.krish.jaatplayer.ui.component.Material3SettingsItem
@@ -50,6 +56,9 @@ fun AxionEqScreen(
     val bandGains by viewModel.bandGains.collectAsState()
     val mode by viewModel.mode.collectAsState()
 
+    val context = LocalContext.current
+    val playerConnection = LocalPlayerConnection.current
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -62,6 +71,27 @@ fun AxionEqScreen(
                         Icon(
                             painter = androidx.compose.ui.res.painterResource(R.drawable.arrow_back),
                             contentDescription = null
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = {
+                            val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+                                putExtra(AudioEffect.EXTRA_AUDIO_SESSION, playerConnection?.service?.player?.audioSessionId ?: 0)
+                                putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+                                putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+                            }
+                            runCatching {
+                                context.startActivity(intent)
+                            }.onFailure {
+                                Toast.makeText(context, "System Equalizer is not available on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.settings),
+                            contentDescription = stringResource(R.string.system_equalizer)
                         )
                     }
                 }
@@ -98,6 +128,23 @@ fun AxionEqScreen(
                             )
                         },
                         onClick = { viewModel.setEnabled(!enabled) }
+                    ),
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.settings),
+                        title = { Text(stringResource(R.string.system_equalizer)) },
+                        description = { Text("Open phone's built-in sound effects & equalizer settings") },
+                        onClick = {
+                            val intent = Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+                                putExtra(AudioEffect.EXTRA_AUDIO_SESSION, playerConnection?.service?.player?.audioSessionId ?: 0)
+                                putExtra(AudioEffect.EXTRA_PACKAGE_NAME, context.packageName)
+                                putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+                            }
+                            runCatching {
+                                context.startActivity(intent)
+                            }.onFailure {
+                                Toast.makeText(context, "System Equalizer is not available on this device", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     )
                 )
             )
@@ -179,6 +226,7 @@ private fun SimpleEqMode(
     onSaveClick: () -> Unit
 ) {
     val reverbPreset by viewModel.reverbPreset.collectAsState()
+    val vocalRemoverMode by viewModel.vocalRemoverMode.collectAsState()
     
     var bass by remember { mutableFloatStateOf(0f) }
     var mid by remember { mutableFloatStateOf(0f) }
@@ -328,6 +376,12 @@ private fun SimpleEqMode(
             enabled = enabled
         )
 
+        VocalRemoverSection(
+            mode = vocalRemoverMode,
+            onModeChange = { viewModel.setVocalRemoverMode(it) },
+            enabled = enabled
+        )
+
         JaatStylesSection(
             enabled = enabled,
             viewModel = viewModel,
@@ -342,15 +396,10 @@ private fun JaatStylesSection(
     viewModel: AxionEqViewModel,
 ) {
     val jaatStylesEnabled by viewModel.jaatStylesEnabled.collectAsState()
-    val jaatStyleMode by viewModel.jaatStyleMode.collectAsState()
     val jaatStylesIntensity by viewModel.jaatStylesIntensity.collectAsState()
-
-    val styleOptions = listOf(
-        JaatStyleMode.BASS_DROP to "Adaptive Bass",
-        JaatStyleMode.MASHUP to "Auto-Mashup",
-        JaatStyleMode.SPATIAL_8D to "8D Swirl",
-        JaatStyleMode.FILTER_SWEEP to "DJ Filter",
-    )
+    val jaatStylesManualPositionEnabled by viewModel.jaatStylesManualPositionEnabled.collectAsState()
+    val jaatStylesManualPan by viewModel.jaatStylesManualPan.collectAsState()
+    val jaatStylesManualDepth by viewModel.jaatStylesManualDepth.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -362,7 +411,7 @@ private fun JaatStylesSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Jaat Styles",
+                text = "Jaat Spatial",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(start = 4.dp)
@@ -376,64 +425,12 @@ private fun JaatStylesSection(
         }
 
         if (jaatStylesEnabled && enabled) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-            ) {
-                styleOptions.forEachIndexed { index, (mode, label) ->
-                    ToggleButton(
-                        checked = jaatStyleMode == mode,
-                        onCheckedChange = { viewModel.setJaatStyleMode(mode) },
-                        enabled = enabled,
-                        shapes = when {
-                            index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                            index == styleOptions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                        },
-                        modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
-                        contentPadding = PaddingValues(horizontal = 2.dp)
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-
-            if (jaatStyleMode == JaatStyleMode.BASS_DROP) {
-                val jaatStylesBassSubMode by viewModel.jaatStylesBassSubMode.collectAsState()
-                val bassSubModeOptions = listOf(
-                    JaatBassSubMode.BEAT_ADAPTIVE to "Beat Adaptive",
-                    JaatBassSubMode.RANDOM_TIMER to "Random Timer (5s+)",
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                ) {
-                    bassSubModeOptions.forEachIndexed { index, (subMode, label) ->
-                        ToggleButton(
-                            checked = jaatStylesBassSubMode == subMode,
-                            onCheckedChange = { viewModel.setJaatStylesBassSubMode(subMode) },
-                            enabled = enabled,
-                            shapes = when {
-                                index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                else -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                            },
-                            modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
-                            contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1
-                            )
-                        }
-                    }
-                }
-            }
+            Text(
+                text = "8D Spatial",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp)
+            )
 
             Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
                 Row(
@@ -458,6 +455,57 @@ private fun JaatStylesSection(
                     valueRange = 0f..1f,
                     enabled = enabled
                 )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Manual Position",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Switch(
+                    checked = jaatStylesManualPositionEnabled,
+                    onCheckedChange = { viewModel.setJaatStylesManualPositionEnabled(it) },
+                    enabled = enabled
+                )
+            }
+
+            if (jaatStylesManualPositionEnabled) {
+                Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Left", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Right", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Slider(
+                        value = jaatStylesManualPan,
+                        onValueChange = { viewModel.setJaatStylesManualPan(it) },
+                        valueRange = -1f..1f,
+                        enabled = enabled
+                    )
+                }
+
+                Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Behind", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Front", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Slider(
+                        value = jaatStylesManualDepth,
+                        onValueChange = { viewModel.setJaatStylesManualDepth(it) },
+                        valueRange = -1f..1f,
+                        enabled = enabled
+                    )
+                }
             }
         }
     }
@@ -512,6 +560,68 @@ private fun ReverbSection(
                     )
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun VocalRemoverSection(
+    mode: VocalRemoverAudioProcessor.Mode,
+    onModeChange: (VocalRemoverAudioProcessor.Mode) -> Unit,
+    enabled: Boolean,
+) {
+    val options = listOf(
+        VocalRemoverAudioProcessor.Mode.OFF to "Off",
+        VocalRemoverAudioProcessor.Mode.REMOVE_VOCALS to "Remove Vocals",
+        VocalRemoverAudioProcessor.Mode.ISOLATE_VOCALS to "Isolate Vocals",
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "Vocal / Music Remover",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        ) {
+            options.forEachIndexed { index, (option, label) ->
+                ToggleButton(
+                    checked = mode == option,
+                    onCheckedChange = { if (enabled) onModeChange(option) },
+                    enabled = enabled,
+                    shapes = when {
+                        index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        index == options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    },
+                    modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+                    contentPadding = PaddingValues(horizontal = 4.dp)
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        AnimatedVisibility(visible = mode == VocalRemoverAudioProcessor.Mode.ISOLATE_VOCALS) {
+            Text(
+                text = "Best-effort only: a phone can't fully separate a finished mix in real time, " +
+                    "so this pushes the vocal forward instead of giving a perfect a cappella.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+            )
         }
     }
 }

@@ -104,7 +104,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CircularWavyProgressIndicator
+import com.krish.jaatplayer.ui.component.JaatLoadingIndicator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -579,7 +579,7 @@ fun ExploreTabContent(
                         .height(200.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularWavyProgressIndicator()
+                    JaatLoadingIndicator()
                 }
             }
         }
@@ -611,7 +611,7 @@ fun AlbumsTabContent(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            CircularWavyProgressIndicator()
+            JaatLoadingIndicator()
         }
     } else {
         LazyVerticalGrid(

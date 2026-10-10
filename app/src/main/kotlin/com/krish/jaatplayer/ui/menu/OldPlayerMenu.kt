@@ -91,6 +91,7 @@ fun OldPlayerMenu(
     onShowDetailsDialog: () -> Unit,
     onDismiss: () -> Unit,
     onOpenEqualizerGlass: (() -> Unit)? = null,
+    onOpenSpeedDialog: (() -> Unit)? = null,
 ) {
     mediaMetadata ?: return
     val context = LocalContext.current
@@ -139,7 +140,6 @@ fun OldPlayerMenu(
     var showChoosePlaylistDialog by rememberSaveable { mutableStateOf(false) }
     var showListenTogetherDialog by rememberSaveable { mutableStateOf(false) }
     var showSelectArtistDialog by rememberSaveable { mutableStateOf(false) }
-    var showPitchTempoDialog by rememberSaveable { mutableStateOf(false) }
     var refetchIconDegree by remember { mutableFloatStateOf(0f) }
     val cacheViewModel = hiltViewModel<CachePlaylistViewModel>()
     val rotationAnimation by animateFloatAsState(
@@ -195,9 +195,10 @@ fun OldPlayerMenu(
         }
     }
 
-    if (showPitchTempoDialog) {
-        TempoPitchDialog(onDismiss = { showPitchTempoDialog = false })
-    }
+    // TempoPitchDialog is rendered at Player.kt's top level now (via onOpenSpeedDialog below),
+    // not here. Rendering it here would nest its own glass overlay inside this menu's bounded
+    // sheet Column, so its "fillMaxSize()" would only cover that bounded area instead of the
+    // true screen — which is exactly what was covering/misplacing the main playback controls.
 
     if (isCasting && castDeviceName != null) {
         Column(
@@ -768,7 +769,7 @@ fun OldPlayerMenu(
                                 )
                             },
                             onClick = {
-                                showPitchTempoDialog = true
+                                onOpenSpeedDialog?.invoke()
                             }
                         )
                     )

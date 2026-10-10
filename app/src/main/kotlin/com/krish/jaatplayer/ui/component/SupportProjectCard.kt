@@ -17,11 +17,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+private val MintCardBackground = Color(0xFF0E2E23)
+private val MintTitleText = Color(0xFFE6F7F2)
+private val MintPrimaryAccent = Color(0xFF2DD4A0)
+private val MintOnPrimaryText = Color(0xFF0A241B)
 
 @Composable
 fun SupportProjectCard(
@@ -33,7 +39,7 @@ fun SupportProjectCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(32.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            containerColor = MintCardBackground
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -44,7 +50,7 @@ fun SupportProjectCard(
             Text(
                 text = "Support the Project",
                 style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MintTitleText,
                 fontWeight = FontWeight.Bold,
                 fontSize = 22.sp,
                 textAlign = TextAlign.Center
@@ -56,7 +62,7 @@ fun SupportProjectCard(
 
             Spacer(Modifier.height(20.dp))
 
-            // Filled dark/primary button: Donate
+            // Filled mint button: Donate
             Button(
                 onClick = onDonateClick,
                 modifier = Modifier
@@ -64,8 +70,8 @@ fun SupportProjectCard(
                     .height(50.dp),
                 shape = RoundedCornerShape(26.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = MintPrimaryAccent,
+                    contentColor = MintOnPrimaryText
                 )
             ) {
                 Text(
@@ -77,16 +83,16 @@ fun SupportProjectCard(
 
             Spacer(Modifier.height(12.dp))
 
-            // Unfilled/outlined button: Later
+            // Outlined mint button: Later
             OutlinedButton(
                 onClick = onLaterClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
                 shape = RoundedCornerShape(26.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                border = BorderStroke(1.dp, MintPrimaryAccent),
                 colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.primary
+                    contentColor = MintPrimaryAccent
                 )
             ) {
                 Text(

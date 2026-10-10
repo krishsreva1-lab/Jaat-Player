@@ -140,7 +140,7 @@ fun BottomSheetMenu(
     val containerColor = if (useGlass) Color.Transparent else background
     val contentColor = MaterialTheme.colorScheme.onSurface
     val sheetModifier = if (useGlass) {
-        modifier.fillMaxHeight().liquidGlass(config = glassEffectConfig, shape = glassShape)
+        modifier.fillMaxHeight().clip(glassShape).liquidGlass(config = glassEffectConfig, shape = glassShape)
     } else {
         modifier.fillMaxHeight()
     }

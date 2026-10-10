@@ -15,8 +15,15 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.krish.jaatplayer.MainActivity
 import com.krish.jaatplayer.R
+import com.krish.jaatplayer.db.DatabaseDao
+import com.krish.jaatplayer.db.entities.RecognitionHistory
+import com.krish.jaatplayer.widget.MusicRecognizerWidgetService
 import com.music.shazamkit.models.RecognitionResult
 import com.music.shazamkit.models.RecognitionStatus
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,6 +34,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.LocalDateTime
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface RecognitionServiceEntryPoint {
+    fun databaseDao(): DatabaseDao
+}
 
 class RecognitionForegroundService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
@@ -34,6 +48,11 @@ class RecognitionForegroundService : Service() {
     private var statusJob: Job? = null
     private var keepNotificationOnStop = false
     private var terminalStateHandled = false
+
+    // True while the floating "over other apps" overlay is the UI for this run. When it is,
+    // the mandatory foreground-service notification is kept as quiet as possible (it used to
+    // be the only UI, which the system showed as the status-bar capsule).
+    private var useOverlay = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -46,6 +65,8 @@ class RecognitionForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Timber.tag(TAG).d("onStartCommand: flags=%d, startId=%d", flags, startId)
+        instance = this
+        useOverlay = RecognitionOverlay.canShow(this)
         if (!startInForeground()) return START_NOT_STICKY
         startRecognitionIfNeeded()
         return START_NOT_STICKY
@@ -56,6 +77,10 @@ class RecognitionForegroundService : Service() {
         recognitionJob?.cancel()
         statusJob?.cancel()
         serviceScope.cancel()
+        if (instance === this) instance = null
+        // The result/error overlay deliberately outlives this service (it stays until the
+        // user taps the cross). Only tear it down if we die mid-recognition.
+        if (useOverlay && !terminalStateHandled) RecognitionOverlay.dismiss()
         if (!keepNotificationOnStop) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         }
@@ -112,6 +137,8 @@ class RecognitionForegroundService : Service() {
         MusicRecognitionService.reset()
         Timber.tag(TAG).d("MusicRecognitionService reset")
 
+        if (useOverlay) showOverlayListening()
+
         statusJob?.cancel()
         statusJob =
             serviceScope.launch {
@@ -138,6 +165,7 @@ class RecognitionForegroundService : Service() {
         when (status) {
             is RecognitionStatus.Listening -> {
                 Timber.tag(TAG).d("Status: Listening")
+                if (useOverlay && showOverlayListening()) return
                 updateNotification(
                     title = getString(R.string.recognize_music),
                     contentText = getString(R.string.recognition_notification_listening),
@@ -151,6 +179,14 @@ class RecognitionForegroundService : Service() {
 
             is RecognitionStatus.Processing -> {
                 Timber.tag(TAG).d("Status: Processing")
+                if (useOverlay &&
+                    overlayOk(
+                        RecognitionOverlay.showProcessing(
+                            applicationContext,
+                            getString(R.string.recognition_notification_processing),
+                        ),
+                    )
+                ) return
                 updateNotification(
                     title = getString(R.string.recognize_music),
                     contentText = getString(R.string.recognition_notification_processing),
@@ -171,6 +207,17 @@ class RecognitionForegroundService : Service() {
                 if (terminalStateHandled) return
                 terminalStateHandled = true
                 Timber.tag(TAG).i("Status: No match")
+                if (useOverlay &&
+                    overlayOk(
+                        RecognitionOverlay.showMessage(
+                            applicationContext,
+                            getString(R.string.recognition_notification_no_match),
+                        ),
+                    )
+                ) {
+                    finishWithPersistentResult()
+                    return
+                }
                 updateNotification(
                     title = getString(R.string.recognize_music),
                     contentText = getString(R.string.recognition_notification_no_match),
@@ -187,6 +234,17 @@ class RecognitionForegroundService : Service() {
                 if (terminalStateHandled) return
                 terminalStateHandled = true
                 Timber.tag(TAG).w("Status: Error — %s", status.message)
+                if (useOverlay &&
+                    overlayOk(
+                        RecognitionOverlay.showMessage(
+                            applicationContext,
+                            getString(R.string.recognition_notification_failed),
+                        ),
+                    )
+                ) {
+                    finishWithPersistentResult()
+                    return
+                }
                 updateNotification(
                     title = getString(R.string.recognize_music),
                     contentText = getString(R.string.recognition_notification_failed),
@@ -235,11 +293,11 @@ class RecognitionForegroundService : Service() {
         actionIntent: PendingIntent?,
         actionTitle: String?,
     ) =
-        NotificationCompat.Builder(this, CHANNEL_ID)
+        NotificationCompat.Builder(this, if (useOverlay) OVERLAY_CHANNEL_ID else CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_widget_mic)
             .setContentTitle(title)
             .setContentText(contentText)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(if (useOverlay) NotificationCompat.PRIORITY_MIN else NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
             .setOngoing(!isTerminal)
             .setAutoCancel(isTerminal)
@@ -257,17 +315,61 @@ class RecognitionForegroundService : Service() {
         terminalStateHandled = true
 
         val pendingIntent = createResultPendingIntent(result)
-        updateNotification(
-            title = result.title,
-            contentText = result.artist,
-            isTerminal = true,
-            contentIntent = pendingIntent,
-            largeIcon = null,
-            actionIntent = pendingIntent,
-            actionTitle = getString(R.string.listen_on_jaatplayer),
-        )
 
-        serviceScope.launch {
+        // Overlay mode: show the song on the floating bubble; it stays until the user taps
+        // the cross, so no result notification is posted at all.
+        val overlayShown =
+            useOverlay &&
+                overlayOk(
+                    RecognitionOverlay.showResult(
+                        context = applicationContext,
+                        title = result.title,
+                        artist = result.artist,
+                        onOpen = { runCatching { pendingIntent.send() } },
+                    ),
+                )
+
+        if (!overlayShown) {
+            updateNotification(
+                title = result.title,
+                contentText = result.artist,
+                isTerminal = true,
+                contentIntent = pendingIntent,
+                largeIcon = null,
+                actionIntent = pendingIntent,
+                actionTitle = getString(R.string.listen_on_jaatplayer),
+            )
+        }
+
+        serviceScope.launch(Dispatchers.IO) {
+            try {
+                val dao = EntryPointAccessors.fromApplication(
+                    applicationContext,
+                    RecognitionServiceEntryPoint::class.java
+                ).databaseDao()
+                dao.insert(
+                    RecognitionHistory(
+                        trackId = result.trackId,
+                        title = result.title,
+                        artist = result.artist,
+                        album = result.album,
+                        coverArtUrl = result.coverArtUrl,
+                        coverArtHqUrl = result.coverArtHqUrl,
+                        genre = result.genre,
+                        releaseDate = result.releaseDate,
+                        label = result.label,
+                        shazamUrl = result.shazamUrl,
+                        appleMusicUrl = result.appleMusicUrl,
+                        spotifyUrl = result.spotifyUrl,
+                        isrc = result.isrc,
+                        youtubeVideoId = result.youtubeVideoId,
+                        recognizedAt = LocalDateTime.now()
+                    )
+                )
+            } catch (e: Exception) {
+                Timber.tag(TAG).e(e, "Failed to save recognition history to DB")
+            }
+
             val coverUrl = result.coverArtHqUrl ?: result.coverArtUrl
             val coverBitmap =
                 if (coverUrl == null) {
@@ -279,15 +381,19 @@ class RecognitionForegroundService : Service() {
                 }
 
             if (coverBitmap != null) {
-                updateNotification(
-                    title = result.title,
-                    contentText = result.artist,
-                    isTerminal = true,
-                    contentIntent = pendingIntent,
-                    largeIcon = coverBitmap,
-                    actionIntent = pendingIntent,
-                    actionTitle = getString(R.string.listen_on_jaatplayer),
-                )
+                if (overlayShown) {
+                    withContext(Dispatchers.Main) { RecognitionOverlay.setCover(coverBitmap) }
+                } else {
+                    updateNotification(
+                        title = result.title,
+                        contentText = result.artist,
+                        isTerminal = true,
+                        contentIntent = pendingIntent,
+                        largeIcon = coverBitmap,
+                        actionIntent = pendingIntent,
+                        actionTitle = getString(R.string.listen_on_jaatplayer),
+                    )
+                }
             }
             finishWithPersistentResult()
         }
@@ -331,9 +437,36 @@ class RecognitionForegroundService : Service() {
     }
 
     private fun finishWithPersistentResult() {
+        if (useOverlay) {
+            // The result lives on the overlay; drop the service and its (quiet) notification.
+            Timber.tag(TAG).d("Finishing; result stays on the overlay until dismissed")
+            keepNotificationOnStop = false
+            stopSelf()
+            return
+        }
         Timber.tag(TAG).d("Finishing with persistent notification")
         keepNotificationOnStop = true
         stopForeground(STOP_FOREGROUND_DETACH)
+        stopSelf()
+    }
+
+    private fun showOverlayListening(): Boolean =
+        overlayOk(
+            RecognitionOverlay.showListening(applicationContext) { cancelFromOverlay() },
+        )
+
+    /** If the overlay window couldn't be added, fall back to the notification UI. */
+    private fun overlayOk(shown: Boolean): Boolean {
+        if (!shown) useOverlay = false
+        return shown
+    }
+
+    private fun cancelRecognition() {
+        Timber.tag(TAG).d("Recognition cancelled from overlay")
+        terminalStateHandled = true
+        recognitionJob?.cancel()
+        MusicRecognitionService.reset()
+        RecognitionOverlay.dismiss()
         stopSelf()
     }
 
@@ -350,7 +483,21 @@ class RecognitionForegroundService : Service() {
                 setShowBadge(false)
             }
 
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
+
+        // Minimal-importance channel used while the floating overlay is the real UI: the
+        // foreground-service notification still has to exist but should stay out of sight.
+        manager.createNotificationChannel(
+            NotificationChannel(
+                OVERLAY_CHANNEL_ID,
+                getString(R.string.recognition_notification_channel_name),
+                NotificationManager.IMPORTANCE_MIN,
+            ).apply {
+                description = getString(R.string.recognition_notification_channel_desc)
+                setShowBadge(false)
+            },
+        )
     }
 
     companion object {
@@ -359,6 +506,16 @@ class RecognitionForegroundService : Service() {
         const val EXTRA_RECOGNITION_ARTIST = "recognition_artist"
 
         private const val CHANNEL_ID = "recognition_channel"
+        private const val OVERLAY_CHANNEL_ID = "recognition_overlay_channel"
+
+        @Volatile
+        private var instance: RecognitionForegroundService? = null
+
+        /** Called by the overlay's Cancel button (main thread). */
+        fun cancelFromOverlay() {
+            val service = instance
+            if (service != null) service.cancelRecognition() else RecognitionOverlay.dismiss()
+        }
         private const val NOTIFICATION_ID = 9100
         private const val RESULT_PENDING_INTENT_REQUEST_CODE = 9101
         private const val TAG = "RecognitionFgService"

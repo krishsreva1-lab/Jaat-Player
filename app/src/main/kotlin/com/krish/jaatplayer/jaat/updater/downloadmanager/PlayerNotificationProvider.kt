@@ -19,6 +19,8 @@ import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.toBitmap
+import com.krish.jaatplayer.R
+import com.krish.jaatplayer.utils.AppLogo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -104,20 +106,28 @@ class JaatNotificationProvider(
             isPlaying
         )
 
+        val titleText = metadata?.title?.toString() ?: context.getString(R.string.app_name)
+        val artistText = metadata?.artist?.toString() ?: metadata?.albumTitle?.toString() ?: ""
+        val albumText = metadata?.albumTitle?.toString()
+
+        val shouldBeOngoing = player.playWhenReady &&
+            player.playbackState != Player.STATE_IDLE &&
+            player.playbackState != Player.STATE_ENDED
+
         val notificationBuilder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(com.krish.jaatplayer.utils.AppLogo.glyphResBlocking(context))
+            .setSmallIcon(AppLogo.glyphResBlocking(context))
+            .setContentTitle(titleText)
+            .setContentText(artistText)
+            .setSubText(albumText)
+            .setLargeIcon(lastBitmap)
             .setContentIntent(mediaSession.sessionActivity)
-            .setOngoing(player.playWhenReady && player.playbackState != Player.STATE_IDLE)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setOngoing(shouldBeOngoing)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setShowWhen(false)
             .setCustomContentView(customViews)
             .setCustomBigContentView(customViews)
             .setStyle(MediaStyleNotificationHelper.MediaStyle(mediaSession))
-
-        val shouldBeOngoing = player.playWhenReady &&
-            player.playbackState != Player.STATE_IDLE &&
-            player.playbackState != Player.STATE_ENDED
 
         val notification = notificationBuilder.build()
         if (shouldBeOngoing) {

@@ -48,6 +48,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -137,6 +138,7 @@ fun LocalSongScreen(
     val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val scanState by viewModel.scanState.collectAsState()
+    val enrichState by viewModel.enrichState.collectAsState()
     val listState = rememberLazyListState()
     val scanSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showScanSheet by rememberSaveable { mutableStateOf(false) }
@@ -344,6 +346,22 @@ fun LocalSongScreen(
                             }
                         },
                         actions = {
+                            IconButton(
+                                onClick = { viewModel.enrichMetadata() },
+                                enabled = !enrichState.isEnriching
+                            ) {
+                                if (enrichState.isEnriching) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        painter = painterResource(R.drawable.sync),
+                                        contentDescription = "Auto-Fetch Artwork & Info",
+                                    )
+                                }
+                            }
                             IconButton(onClick = { isSearchActive = true }) {
                                 Icon(
                                     painter = painterResource(R.drawable.search),

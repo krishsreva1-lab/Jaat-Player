@@ -34,7 +34,11 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 527
-        versionName = "1.8.0"
+        versionName = "1.8.3." +
+                "" +
+                "" +
+                "" +
+                ""
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -132,12 +136,6 @@ android {
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true
-        }
-        getByName("debug") {
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-            storePassword = "android"
-            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
         }
     }
 
@@ -245,7 +243,8 @@ ksp {
 
 androidComponents {
     beforeVariants { variantBuilder ->
-        if (variantBuilder.buildType == "debug" && variantBuilder.flavorName?.contains("universal") == false) {
+        val enableSplits = project.hasProperty("enableAbiSplits") && project.property("enableAbiSplits") == "true"
+        if (!enableSplits && variantBuilder.flavorName?.contains("universal") == false) {
             variantBuilder.enable = false
         }
     }
@@ -254,8 +253,7 @@ androidComponents {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         freeCompilerArgs.addAll(
-            "-opt-in=kotlin.RequiresOptIn",
-            "-Xbackend-threads=0"
+            "-opt-in=kotlin.RequiresOptIn"
         )
         suppressWarnings.set(false)
     }

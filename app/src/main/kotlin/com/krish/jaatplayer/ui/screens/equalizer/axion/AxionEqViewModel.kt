@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.krish.jaatplayer.eq.EqualizerService
 import com.krish.jaatplayer.eq.Reverb3DService
+import com.krish.jaatplayer.eq.VocalRemoverService
 import com.krish.jaatplayer.eq.audio.Reverb3DPreset
+import com.krish.jaatplayer.eq.audio.VocalRemoverAudioProcessor
 import com.krish.jaatplayer.eq.data.EQProfileRepository
 import com.krish.jaatplayer.eq.data.FilterType
 import com.krish.jaatplayer.eq.data.ParametricEQBand
@@ -26,6 +28,9 @@ import com.krish.jaatplayer.constants.JaatStylesBassSubModeKey
 import com.krish.jaatplayer.constants.JaatStylesEnabledKey
 import com.krish.jaatplayer.constants.JaatStylesIntensityKey
 import com.krish.jaatplayer.constants.JaatStylesModeKey
+import com.krish.jaatplayer.constants.JaatStylesManualPositionEnabledKey
+import com.krish.jaatplayer.constants.JaatStylesManualPanKey
+import com.krish.jaatplayer.constants.JaatStylesManualDepthKey
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,6 +38,7 @@ class AxionEqViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val equalizerService: EqualizerService,
     private val reverb3DService: Reverb3DService,
+    private val vocalRemoverService: VocalRemoverService,
     private val eqProfileRepository: EQProfileRepository
 ) : ViewModel() {
 
@@ -53,6 +59,33 @@ class AxionEqViewModel @Inject constructor(
         val subModeStr = it[JaatStylesBassSubModeKey] ?: "BEAT_ADAPTIVE"
         runCatching { JaatBassSubMode.valueOf(subModeStr) }.getOrDefault(JaatBassSubMode.BEAT_ADAPTIVE)
     }.stateIn(viewModelScope, SharingStarted.Lazily, JaatBassSubMode.BEAT_ADAPTIVE)
+
+    val jaatStylesManualPositionEnabled = context.dataStore.data.map { it[JaatStylesManualPositionEnabledKey] ?: false }
+        .stateIn(viewModelScope, SharingStarted.Lazily, false)
+
+    val jaatStylesManualPan = context.dataStore.data.map { it[JaatStylesManualPanKey] ?: 0f }
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0f)
+
+    val jaatStylesManualDepth = context.dataStore.data.map { it[JaatStylesManualDepthKey] ?: 0f }
+        .stateIn(viewModelScope, SharingStarted.Lazily, 0f)
+
+    fun setJaatStylesManualPositionEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.dataStore.edit { it[JaatStylesManualPositionEnabledKey] = enabled }
+        }
+    }
+
+    fun setJaatStylesManualPan(pan: Float) {
+        viewModelScope.launch {
+            context.dataStore.edit { it[JaatStylesManualPanKey] = pan }
+        }
+    }
+
+    fun setJaatStylesManualDepth(depth: Float) {
+        viewModelScope.launch {
+            context.dataStore.edit { it[JaatStylesManualDepthKey] = depth }
+        }
+    }
 
     fun setJaatStylesEnabled(enabled: Boolean) {
         viewModelScope.launch {
@@ -90,6 +123,18 @@ class AxionEqViewModel @Inject constructor(
         reverb3DService.applyPreset(preset)
     }
 
+    private val _vocalRemoverMode = MutableStateFlow(
+        runCatching { VocalRemoverAudioProcessor.Mode.valueOf(prefs.getString("vocal_remover_mode", null) ?: "OFF") }
+            .getOrDefault(VocalRemoverAudioProcessor.Mode.OFF)
+    )
+    val vocalRemoverMode = _vocalRemoverMode.asStateFlow()
+
+    fun setVocalRemoverMode(mode: VocalRemoverAudioProcessor.Mode) {
+        _vocalRemoverMode.value = mode
+        prefs.edit().putString("vocal_remover_mode", mode.name).apply()
+        vocalRemoverService.setMode(mode)
+    }
+
     private val _enabled = MutableStateFlow(prefs.getBoolean("enabled", false))
     val enabled = _enabled.asStateFlow()
 
@@ -116,6 +161,9 @@ class AxionEqViewModel @Inject constructor(
         }
         if (_reverbPreset.value != Reverb3DPreset.NONE) {
             reverb3DService.applyPreset(_reverbPreset.value)
+        }
+        if (_vocalRemoverMode.value != VocalRemoverAudioProcessor.Mode.OFF) {
+            vocalRemoverService.setMode(_vocalRemoverMode.value)
         }
     }
 

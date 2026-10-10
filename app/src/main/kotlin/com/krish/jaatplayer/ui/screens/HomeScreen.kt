@@ -587,6 +587,33 @@ fun DailyDiscoverCard(
 }
 
 
+/**
+ * Combines hero-carousel sources in priority order, de-duplicating by id, and keeps
+ * pulling from later (fallback) sources until [minCount] items are gathered or every
+ * source is exhausted.
+ *
+ * Each hero section used to pick its list with a plain `.ifEmpty { fallback }` chain,
+ * which stops at the very first source that has *any* items — even just one. A
+ * favorites/recommendation source that matched a single song, or a playback queue
+ * with just one song in it, would pass straight through as "not empty" and the
+ * richer fallback sources (quick picks, forgotten favorites, home feed) never got a
+ * chance to pad it out. That's what made the 3D carousel look like it only had one
+ * song to show (nothing left to peek at on either side) even though those other
+ * sources genuinely had more songs available. Merging instead of short-circuiting
+ * fixes that while still respecting the same source priority order.
+ */
+private fun mergeHeroSongItems(vararg sources: List<SongItem>, minCount: Int = 5): List<SongItem> {
+    val result = mutableListOf<SongItem>()
+    val seenIds = mutableSetOf<String>()
+    for (source in sources) {
+        for (item in source) {
+            if (result.size >= minCount) return result
+            if (seenIds.add(item.id)) result.add(item)
+        }
+    }
+    return result
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeHeroCarousel(
@@ -664,16 +691,14 @@ fun HomeHeroCarousel(
                                 translationX = if (pagerState.currentPage > page) 40f * pageOffset else -40f * pageOffset
                             }
                     ) {
-                        HeroItemWrapper {
-                            HomeHeroItem(
-                                item = items[page],
-                                navController = navController,
-                                playerConnection = playerConnection,
-                                menuState = menuState,
-                                haptic = haptic,
-                                scope = scope
-                            )
-                        }
+                        HomeHeroItemStandalone(
+                            item = items[page],
+                            navController = navController,
+                            playerConnection = playerConnection,
+                            menuState = menuState,
+                            haptic = haptic,
+                            scope = scope
+                        )
                     }
                 }
             }
@@ -688,31 +713,18 @@ fun HomeHeroCarousel(
                         .fillMaxWidth()
                         .height(280.dp)
                 ) { page ->
-                    HeroItemWrapper {
-                        HomeHeroItem(
-                            item = items[page],
-                            navController = navController,
-                            playerConnection = playerConnection,
-                            menuState = menuState,
-                            haptic = haptic,
-                            scope = scope
-                        )
-                    }
+                    HomeHeroItemStandalone(
+                        item = items[page],
+                        navController = navController,
+                        playerConnection = playerConnection,
+                        menuState = menuState,
+                        haptic = haptic,
+                        scope = scope
+                    )
                 }
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HeroItemWrapper(content: @Composable CarouselItemScope.() -> Unit) {
-    // This is a dummy wrapper that provides CarouselItemScope
-    HorizontalCenteredHeroCarousel(
-        state = rememberCarouselState { 1 },
-        modifier = Modifier.fillMaxSize(),
-        content = { content() }
-    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -726,14 +738,71 @@ fun CarouselItemScope.HomeHeroItem(
     scope: kotlinx.coroutines.CoroutineScope,
 ) {
     val shape = RoundedCornerShape(32.dp)
+    HomeHeroItemBody(
+        item = item,
+        navController = navController,
+        playerConnection = playerConnection,
+        menuState = menuState,
+        haptic = haptic,
+        scope = scope,
+        shapeModifier = Modifier
+            .maskClip(shape)
+            .maskBorder(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+    )
+}
+
+/**
+ * Plain (non-[CarouselItemScope]) version used by Design B/C's "3D stack" and
+ * "panoramic" carousels, which are driven by a real [androidx.compose.foundation.pager.HorizontalPager]
+ * and a custom `graphicsLayer` transform — not Material3's real multi-item Carousel.
+ *
+ * Previously these designs still routed through a dummy single-item
+ * single-item `HorizontalCenteredHeroCarousel` whose only purpose was to obtain a
+ * [CarouselItemScope] so `.maskClip()`/`.maskBorder()` could be called. That inner
+ * carousel computes its own mask/keyline sizing independent of the outer pager's
+ * scaled-down, rotated slot, which is what was clipping the tilted side cards
+ * right at (or before) the screen edge instead of letting them peek into the
+ * pager's `contentPadding` gutter. Using plain `.clip()`/`.border()` here clips
+ * strictly to this composable's own real measured bounds — nothing more — which
+ * lets the side cards render fully within the peek area as intended.
+ */
+@Composable
+fun HomeHeroItemStandalone(
+    item: YTItem,
+    navController: NavController,
+    playerConnection: PlayerConnection,
+    menuState: com.krish.jaatplayer.ui.component.MenuState,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    val shape = RoundedCornerShape(32.dp)
+    HomeHeroItemBody(
+        item = item,
+        navController = navController,
+        playerConnection = playerConnection,
+        menuState = menuState,
+        haptic = haptic,
+        scope = scope,
+        shapeModifier = Modifier
+            .clip(shape)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shape)
+    )
+}
+
+@Composable
+private fun HomeHeroItemBody(
+    item: YTItem,
+    navController: NavController,
+    playerConnection: PlayerConnection,
+    menuState: com.krish.jaatplayer.ui.component.MenuState,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    scope: kotlinx.coroutines.CoroutineScope,
+    shapeModifier: Modifier,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .maskClip(shape)
-            .maskBorder(
-                BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shape
-            )
+            .then(shapeModifier)
             .combinedClickable(
                 onClick = {
                     when (item) {
@@ -1342,9 +1411,7 @@ fun HomeScreen(
                                     explicit = false
                                 )
                             }
-                            val songItems = favoritesBasedSongs
-                                .ifEmpty { homeSongItems }
-                                .ifEmpty { quickPicksAsSongItems }
+                            val songItems = mergeHeroSongItems(favoritesBasedSongs, homeSongItems, quickPicksAsSongItems)
                             
                             if (songItems.isNotEmpty()) {
                                 item(key = "hero_banner") {
@@ -1387,7 +1454,7 @@ fun HomeScreen(
                                     explicit = false
                                 )
                             }
-                            val songItems = networkSongItems.ifEmpty { localFallbackSongItems }.ifEmpty { guaranteedFallbackSongItems }
+                            val songItems = mergeHeroSongItems(networkSongItems, localFallbackSongItems, guaranteedFallbackSongItems)
                             if (songItems.isNotEmpty()) {
                                 item(key = "taste_hero") {
                                     HomeHeroCarousel(
@@ -1442,7 +1509,7 @@ fun HomeScreen(
                                     explicit = false
                                 )
                             }
-                            val songItems = queueSongItems.ifEmpty { localFallbackSongItems }.ifEmpty { guaranteedFallbackSongItems }
+                            val songItems = mergeHeroSongItems(queueSongItems, localFallbackSongItems, guaranteedFallbackSongItems)
                             if (songItems.isNotEmpty()) {
                                 item(key = "discovery_hero") {
                                     HomeHeroCarousel(

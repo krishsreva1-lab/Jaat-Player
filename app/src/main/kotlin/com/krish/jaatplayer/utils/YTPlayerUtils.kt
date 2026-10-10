@@ -78,7 +78,7 @@ object YTPlayerUtils {
     // Single flat, ordered fallback list tried for EVERY track — no content-type branching, no
     // category can end up starved of a working client.
     //
-    // Reordered against the Echo Music reference build's measured results:
+    // Reordered against the Jaat Player reference build's measured results:
     // - VISIONOS is the only client measured to serve a whole file start-to-finish; it now leads.
     // - ANDROID_VR_1_61_48 and TVHTML5_SIMPLY_EMBEDDED_PLAYER are dropped: both are confirmed dead
     //   (bot-gated / "no longer supported" respectively) and only cost a round trip on every

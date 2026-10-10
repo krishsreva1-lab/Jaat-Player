@@ -8,7 +8,9 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.krish.jaatplayer.R
 import com.krish.jaatplayer.db.MusicDatabase
@@ -72,6 +74,7 @@ class LocalSongScanner
 constructor(
     @ApplicationContext private val context: Context,
     private val database: MusicDatabase,
+    private val metadataEnricher: LocalMetadataEnricher,
 ) {
     suspend fun scanDevice(scanConfig: LocalSongScanConfig = LocalSongScanConfig()): LocalSongScanSummary = withContext(Dispatchers.IO) {
         val snapshot = queryTracks(scanConfig)
@@ -213,6 +216,9 @@ constructor(
                 scannedSongs = snapshot.tracks.size,
                 removedSongs = removedIds.size,
             )
+        }
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { metadataEnricher.enrichAllLocalSongs() }
         }
         return@withContext summary
     }

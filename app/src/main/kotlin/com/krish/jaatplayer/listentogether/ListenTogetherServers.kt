@@ -27,7 +27,7 @@ object ListenTogetherServers {
         listOf(
             ListenTogetherServer(
                 name = "Jaat Player Server",
-                url = "wss://iad1tya-jaatplayer.hf.space/ws",
+                url = "wss://jaat-listen-together.krishsreva675.workers.dev",
                 location = "Global",
                 operator = "JAATPLAYER"
             )
@@ -47,9 +47,9 @@ object ListenTogetherServers {
                 val response = client.newCall(request).execute()
                 response.body?.string()?.let { jsonString ->
                     val jsonObject = Json.parseToJsonElement(jsonString).jsonObject
-                    val name = jsonObject["name"]?.jsonPrimitive?.content ?: "Hugging Face Sync"
-                    val url = jsonObject["serverUrl"]?.jsonPrimitive?.content ?: "wss://devilmi-vivi-music-listen-together.hf.space"
-                    val region = jsonObject["region"]?.jsonPrimitive?.content ?: "Global - VIVIDH"
+                    val name = jsonObject["name"]?.jsonPrimitive?.content ?: "Jaat Player Server"
+                    val url = jsonObject["serverUrl"]?.jsonPrimitive?.content ?: "wss://jaat-listen-together.krishsreva675.workers.dev"
+                    val region = jsonObject["region"]?.jsonPrimitive?.content ?: "Global - Jaat Player"
                     
                     _servers.value = listOf(
                         ListenTogetherServer(

@@ -345,10 +345,39 @@ fun GlassEffectSettings(
         val (speedMenuEnabled, onSpeedMenuEnabledChange) = rememberPreference(LiquidGlassSpeedMenuEnabledKey, defaultValue = false)
         val (sleepTimerMenuEnabled, onSleepTimerMenuEnabledChange) = rememberPreference(LiquidGlassSleepTimerMenuEnabledKey, defaultValue = false)
         val (equalizerMenuEnabled, onEqualizerMenuEnabledChange) = rememberPreference(LiquidGlassEqualizerMenuEnabledKey, defaultValue = true)
+        val (settingsMenuEnabled, onSettingsMenuEnabledChange) = rememberPreference(LiquidGlassSettingsMenuEnabledKey, defaultValue = false)
         val (menuBlur, onMenuBlurChange) = rememberPreference(LiquidGlassMenuBlurRadiusKey, defaultValue = 12f)
         val (menuVibrancy, onMenuVibrancyChange) = rememberPreference(LiquidGlassMenuVibrancyKey, defaultValue = 1f)
         val (menuLensHeight, onMenuLensHeightChange) = rememberPreference(LiquidGlassMenuLensHeightKey, defaultValue = 0.5f)
         val (menuLensAmount, onMenuLensAmountChange) = rememberPreference(LiquidGlassMenuLensAmountKey, defaultValue = 0.5f)
+
+        val (animStyle, onAnimStyleChange) = rememberPreference(LiquidGlassAnimationStyleKey, defaultValue = "capsule")
+
+        Material3SettingsGroup(
+            title = stringResource(R.string.liquid_glass_animation_style),
+            items = listOf(
+                Material3SettingsItem(
+                    title = { Text(stringResource(R.string.liquid_glass_anim_capsule)) },
+                    description = { Text(stringResource(R.string.liquid_glass_anim_capsule_desc)) },
+                    trailingContent = { RadioButton(selected = animStyle == "capsule", onClick = { onAnimStyleChange("capsule") }) },
+                    onClick = { onAnimStyleChange("capsule") }
+                ),
+                Material3SettingsItem(
+                    title = { Text(stringResource(R.string.liquid_glass_anim_fade)) },
+                    description = { Text(stringResource(R.string.liquid_glass_anim_fade_desc)) },
+                    trailingContent = { RadioButton(selected = animStyle == "fade", onClick = { onAnimStyleChange("fade") }) },
+                    onClick = { onAnimStyleChange("fade") }
+                ),
+                Material3SettingsItem(
+                    title = { Text(stringResource(R.string.liquid_glass_anim_escape)) },
+                    description = { Text(stringResource(R.string.liquid_glass_anim_escape_desc)) },
+                    trailingContent = { RadioButton(selected = animStyle == "escape", onClick = { onAnimStyleChange("escape") }) },
+                    onClick = { onAnimStyleChange("escape") }
+                ),
+            )
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Material3SettingsGroup(
             title = stringResource(R.string.liquid_glass_menu_style),
@@ -459,6 +488,12 @@ fun GlassEffectSettings(
                     title = { Text(stringResource(R.string.equalizer) + " Menu") },
                     trailingContent = { Switch(checked = equalizerMenuEnabled, onCheckedChange = onEqualizerMenuEnabledChange) },
                     onClick = { onEqualizerMenuEnabledChange(!equalizerMenuEnabled) }
+                ),
+                Material3SettingsItem(
+                    title = { Text(stringResource(R.string.liquid_glass_settings_menu)) },
+                    description = { Text("True glass effect for the account/settings popup, showing the mini player and nav bar behind it") },
+                    trailingContent = { Switch(checked = settingsMenuEnabled, onCheckedChange = onSettingsMenuEnabledChange) },
+                    onClick = { onSettingsMenuEnabledChange(!settingsMenuEnabled) }
                 ),
             )
         )

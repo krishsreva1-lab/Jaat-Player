@@ -266,8 +266,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.geometry.Size
+import com.krish.jaatplayer.constants.LiquidGlassAnimationStyleKey
 import com.krish.jaatplayer.constants.LiquidGlassEqCardEnabledKey
 import com.krish.jaatplayer.ui.component.EqualizerGlassCard
+import com.krish.jaatplayer.ui.component.GlassMenu
 
 
 private data class WavyShape(
@@ -540,40 +542,17 @@ fun BottomSheetPlayer(
                             .background(Color.Black.copy(alpha = 0.55f))
                             .padding(6.dp)
                     ) {
-                        Text("JAAT STYLES  [${dbg.mode.name} - ${dbg.intensityPercent}%]", style = mono, color = MaterialTheme.colorScheme.primary)
-                        when (dbg.mode) {
-                            com.krish.jaatplayer.constants.JaatStyleMode.BASS_DROP -> {
-                                Text(
-                                    "Sub-mode: ${dbg.bassSubMode.name}  |  Hold Timer: %.1fs".format(dbg.holdSecondsRemaining),
-                                    style = mono, color = Color.White.copy(alpha = 0.85f)
-                                )
-                                Text(
-                                    "Gain: %.1f dB (Target: %.1f dB)".format(dbg.currentBassGainDb, dbg.targetBassGainDb),
-                                    style = mono, color = Color.White.copy(alpha = 0.85f)
-                                )
-                                Text(
-                                    if (dbg.targetBassGainDb == 0.0) "State: DROP / HIGH INTENSITY (0.0 dB)" else "State: VERSE ATTENUATION (-8.0 dB) [Min 5s]",
-                                    style = mono, color = if (dbg.targetBassGainDb == 0.0) Color.Green else Color.Yellow
-                                )
-                            }
-                            com.krish.jaatplayer.constants.JaatStyleMode.SPATIAL_8D -> {
-                                Text(
-                                    "360° Orbit Angle: ${dbg.orbitAngleDeg}°",
-                                    style = mono, color = Color.White.copy(alpha = 0.85f)
-                                )
-                            }
-                            com.krish.jaatplayer.constants.JaatStyleMode.FILTER_SWEEP -> {
-                                Text(
-                                    "Filter Cutoff Sweep: ${dbg.filterCutoffHz} Hz",
-                                    style = mono, color = Color.White.copy(alpha = 0.85f)
-                                )
-                            }
-                            com.krish.jaatplayer.constants.JaatStyleMode.MASHUP -> {
-                                Text(
-                                    "Rhythmic Beat Ducking Pulse Active",
-                                    style = mono, color = Color.White.copy(alpha = 0.85f)
-                                )
-                            }
+                        Text("JAAT SPATIAL 8D  [${dbg.intensityPercent}%]", style = mono, color = MaterialTheme.colorScheme.primary)
+                        if (dbg.manualPositionEnabled) {
+                            Text(
+                                "Manual Position  |  Pan: ${dbg.panPercent}%  Depth: ${dbg.depthPercent}%",
+                                style = mono, color = Color.White.copy(alpha = 0.85f)
+                            )
+                        } else {
+                            Text(
+                                "360° Orbit Angle: ${dbg.orbitAngleDeg}°",
+                                style = mono, color = Color.White.copy(alpha = 0.85f)
+                            )
                         }
                     }
                 }
@@ -1912,7 +1891,7 @@ fun BottomSheetPlayer(
                                 com.krish.jaatplayer.ui.component.isGlassSupported()
 
                             fun openOldPlayerMenu() {
-                                playerMenuState.show(glassMenu = com.krish.jaatplayer.ui.component.GlassMenu.PLAYER) {
+                                playerMenuState.show(glassMenu = GlassMenu.QUALITY) {
                                     OldPlayerMenu(
                                         mediaMetadata = mediaMetadata,
                                         navController = navController,
@@ -3070,9 +3049,12 @@ fun BottomSheetPlayer(
             val dialogShape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
 
             var isOverlayActive by remember { mutableStateOf(showSleepTimerDialog) }
-            LaunchedEffect(showSleepTimerDialog) {
-                if (showSleepTimerDialog) isOverlayActive = true
-            }
+            if (showSleepTimerDialog) isOverlayActive = true
+            val sleepVisibleState = com.krish.jaatplayer.ui.component.rememberGlassVisibleState(showSleepTimerDialog)
+            val (sleepAnimStyle) = rememberPreference(
+                key = LiquidGlassAnimationStyleKey,
+                defaultValue = "capsule"
+            )
 
             if (isOverlayActive) {
                 androidx.activity.compose.BackHandler(enabled = showSleepTimerDialog) {
@@ -3090,9 +3072,9 @@ fun BottomSheetPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = showSleepTimerDialog,
-                        enter = scaleIn(initialScale = 0.9f, animationSpec = tween(220)) + fadeIn(animationSpec = tween(220)),
-                        exit = scaleOut(targetScale = 0.9f, animationSpec = tween(180)) + fadeOut(animationSpec = tween(180)),
+                        visibleState = sleepVisibleState,
+                        enter = com.krish.jaatplayer.ui.component.glassEnterTransition(sleepAnimStyle),
+                        exit = com.krish.jaatplayer.ui.component.glassExitTransition(sleepAnimStyle),
                     ) {
                         DisposableEffect(Unit) {
                             onDispose { isOverlayActive = false }
@@ -3167,13 +3149,29 @@ fun BottomSheetPlayer(
             }
 
             var isEqualizerGlassActive by remember { mutableStateOf(showEqualizerGlassCard) }
-            LaunchedEffect(showEqualizerGlassCard) {
-                if (showEqualizerGlassCard) isEqualizerGlassActive = true
-            }
+            if (showEqualizerGlassCard) isEqualizerGlassActive = true
+            val eqVisibleState = com.krish.jaatplayer.ui.component.rememberGlassVisibleState(showEqualizerGlassCard)
 
             if (isEqualizerGlassActive) {
                 BackHandler(enabled = showEqualizerGlassCard) {
                     showEqualizerGlassCard = false
+                }
+
+                val (eqAnimStyle) = rememberPreference(
+                    key = LiquidGlassAnimationStyleKey,
+                    defaultValue = "capsule"
+                )
+
+                val eqEnterTransition = when (eqAnimStyle) {
+                    "fade" -> fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing))
+                    "escape" -> scaleIn(initialScale = 0.65f, animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessLow)) + fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing))
+                    else -> scaleIn(initialScale = 0.22f, animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessLow)) + fadeIn(animationSpec = tween(260, easing = FastOutSlowInEasing)) // "capsule"
+                }
+
+                val eqExitTransition = when (eqAnimStyle) {
+                    "fade" -> fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing))
+                    "escape" -> scaleOut(targetScale = 0.65f, animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) + fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing))
+                    else -> scaleOut(targetScale = 0.20f, animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) + fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)) // "capsule"
                 }
 
                 Box(
@@ -3187,9 +3185,9 @@ fun BottomSheetPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     AnimatedVisibility(
-                        visible = showEqualizerGlassCard,
-                        enter = scaleIn(initialScale = 0.88f, animationSpec = spring(dampingRatio = 0.78f, stiffness = Spring.StiffnessLow)) + fadeIn(animationSpec = tween(220, easing = FastOutSlowInEasing)),
-                        exit = scaleOut(targetScale = 0.88f, animationSpec = spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessLow)) + fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)),
+                        visibleState = eqVisibleState,
+                        enter = eqEnterTransition,
+                        exit = eqExitTransition,
                     ) {
                         DisposableEffect(Unit) {
                             onDispose { isEqualizerGlassActive = false }
@@ -3340,7 +3338,7 @@ fun MoreActionsButton(
         com.krish.jaatplayer.ui.component.isGlassSupported()
 
     fun openMaterialMenu() {
-        menuState.show {
+        menuState.show(glassMenu = GlassMenu.QUALITY) {
             PlayerMenu(
                 mediaMetadata = mediaMetadata,
                 navController = navController,
@@ -3406,7 +3404,7 @@ private fun PlayerMoreMenuButton(
             .clip(RoundedCornerShape(24.dp))
             .background(textButtonColor)
             .clickable {
-                menuState.show {
+                menuState.show(glassMenu = GlassMenu.QUALITY) {
                     PlayerMenu(
                         mediaMetadata = mediaMetadata,
                         navController = navController,

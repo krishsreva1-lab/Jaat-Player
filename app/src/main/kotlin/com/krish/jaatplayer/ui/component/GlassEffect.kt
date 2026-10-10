@@ -1,5 +1,5 @@
 /**
- * vivimusic Project (C) 2026
+ * Jaat Player Project (C) 2026
  * Licensed under GPL-3.0 | See git history for contributors
  */
 
@@ -88,7 +88,7 @@ enum class GlassStyle {
 
 /** The individually toggleable menus in the per-menu Liquid Glass system. */
 enum class GlassMenu {
-    PLAYER, QUEUE, QUALITY, SPEAKER, SPEED, SLEEP_TIMER, EQUALIZER
+    PLAYER, QUEUE, QUALITY, SPEAKER, SPEED, SLEEP_TIMER, EQUALIZER, SETTINGS
 }
 
 /**
@@ -110,6 +110,7 @@ data class MenuGlassConfig(
     val speedMenuEnabled: Boolean = false,
     val sleepTimerMenuEnabled: Boolean = false,
     val equalizerMenuEnabled: Boolean = true,
+    val settingsMenuEnabled: Boolean = false,
 ) {
     fun isEnabledFor(menu: GlassMenu): Boolean = when (menu) {
         GlassMenu.PLAYER -> playerMenuEnabled
@@ -119,6 +120,7 @@ data class MenuGlassConfig(
         GlassMenu.SPEED -> speedMenuEnabled
         GlassMenu.SLEEP_TIMER -> sleepTimerMenuEnabled
         GlassMenu.EQUALIZER -> equalizerMenuEnabled
+        GlassMenu.SETTINGS -> settingsMenuEnabled
     }
 
     /** Builds a [GlassEffectConfig] for use with [Modifier.liquidGlass], applying this style's edge-effect defaults. */
