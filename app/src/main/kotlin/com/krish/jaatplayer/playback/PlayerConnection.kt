@@ -159,6 +159,7 @@ class PlayerConnection(
     val isCrossfading: kotlinx.coroutines.flow.StateFlow<Boolean> = service.isCrossfading
     val isAutomixing: kotlinx.coroutines.flow.StateFlow<Boolean> = service.isAutomixing
     val automixDebugInfo: kotlinx.coroutines.flow.StateFlow<MusicService.AutomixDebugInfo?> = service.automixDebugInfo
+    val djState = service.djState
     val jaatStylesDebugInfo = service.jaatStylesDebugInfo
 
     
@@ -378,6 +379,14 @@ class PlayerConnection(
                 castHandler.skipToNext()
                 return
             }
+            if (service.canManualCrossfade) {
+                val nextIndex = player.nextMediaItemIndex
+                if (nextIndex != androidx.media3.common.C.INDEX_UNSET) {
+                    service.startManualTrackTransition(nextIndex)
+                    onSkipNext?.invoke()
+                    return
+                }
+            }
             player.seekToNext()
             if (player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
                 player.prepare()
@@ -410,7 +419,12 @@ class PlayerConnection(
                 player.playWhenReady = true
                 onRestartSong?.invoke()
             } else {
-                
+                val prevIndex = player.previousMediaItemIndex
+                if (service.canManualCrossfade && prevIndex != androidx.media3.common.C.INDEX_UNSET) {
+                    service.startManualTrackTransition(prevIndex)
+                    onSkipPrevious?.invoke()
+                    return
+                }
                 player.seekToPreviousMediaItem()
                 if (player.playbackState == Player.STATE_IDLE || player.playbackState == Player.STATE_ENDED) {
                     player.prepare()

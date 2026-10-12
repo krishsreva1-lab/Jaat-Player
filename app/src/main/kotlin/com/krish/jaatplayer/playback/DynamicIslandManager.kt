@@ -11,6 +11,7 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import com.krish.jaatplayer.constants.DynamicIslandEnabledKey
+import com.krish.jaatplayer.constants.DynamicIslandExpandedStyleKey
 import com.krish.jaatplayer.ui.overlay.DynamicIslandView
 import com.krish.jaatplayer.utils.dataStore
 import kotlinx.coroutines.CoroutineScope
@@ -19,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -86,6 +88,24 @@ class DynamicIslandManager(private val service: MusicService) {
             .onEach {
                 featureEnabled = it
                 refresh()
+            }
+            .launchIn(scope)
+
+        service.dataStore.data
+            .map { it[DynamicIslandExpandedStyleKey] ?: "BLURRED_ART" }
+            .distinctUntilChanged()
+            .onEach { style ->
+                island.updateExpandedStyle(style)
+            }
+            .launchIn(scope)
+
+        service.currentMediaMetadata
+            .distinctUntilChangedBy { it?.id }
+            .onEach { metadata ->
+                if (metadata != null) {
+                    dismissedForTrackId = null
+                    refresh()
+                }
             }
             .launchIn(scope)
 

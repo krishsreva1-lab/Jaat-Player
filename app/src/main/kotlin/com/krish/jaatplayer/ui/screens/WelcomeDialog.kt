@@ -230,6 +230,13 @@ private fun ColumnScope.WelcomeDialogContent(
                         subtitle = "t.me/jaatplayerr",
                         onClick = { uriHandler.openUri("https://t.me/jaatplayerr") }
                     )
+                    WelcomeDivider()
+                    WelcomeActionRow(
+                        icon = painterResource(R.drawable.ic_discord_new),
+                        title = "Discord Server",
+                        subtitle = "discord.gg/8tEpMnPD7S",
+                        onClick = { uriHandler.openUri("https://discord.gg/8tEpMnPD7S") }
+                    )
                 }
 
                 WelcomeSectionCard(title = "Support & Donate") {

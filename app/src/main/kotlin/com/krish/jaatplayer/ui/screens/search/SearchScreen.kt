@@ -2,8 +2,15 @@
 
 package com.krish.jaatplayer.ui.screens.search
 
+import android.content.Context
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,12 +30,29 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import com.krish.jaatplayer.ui.component.GlassComponent
+import com.krish.jaatplayer.ui.component.LocalGlassEffectConfig
+import com.krish.jaatplayer.ui.component.backdrop.catalog.utils.DampedDragAnimation
+import com.krish.jaatplayer.ui.component.isGlassSupported
+import com.krish.jaatplayer.ui.component.liquidGlass
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -53,11 +77,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,6 +91,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -148,12 +175,13 @@ fun SearchScreen(
 
     LaunchedEffect(searchActive) {
         if (searchActive) {
-            
-            
             kotlinx.coroutines.delay(100)
             showSearchContent = true
+            try { focusRequester.requestFocus() } catch (_: Exception) {}
         } else {
             showSearchContent = false
+            focusManager.clearFocus()
+            keyboardController?.hide()
         }
     }
 
@@ -407,49 +435,11 @@ fun SearchScreen(
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(8.dp))
-                        SecondaryTabRow(
+                        SearchGlassDock(
                             selectedTabIndex = selectedTabIndex,
-                            containerColor = Color.Transparent,
-                            indicator = {
-                                Box(
-                                    modifier = Modifier
-                                        .tabIndicatorOffset(selectedTabIndex)
-                                        .fillMaxWidth(),
-                                    contentAlignment = Alignment.BottomCenter
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(32.dp)
-                                            .height(3.dp)
-                                            .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                                            .background(MaterialTheme.colorScheme.primary)
-                                    )
-                                }
-                            }
-                        ) {
-                            Tab(
-                                selected = selectedTabIndex == 0,
-                                onClick = { selectedTabIndex = 0 },
-                                selectedContentColor = MaterialTheme.colorScheme.primary,
-                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                text = { Text(stringResource(R.string.tab_explore)) }
-                            )
-                            Tab(
-                                selected = selectedTabIndex == 1,
-                                onClick = { selectedTabIndex = 1 },
-                                selectedContentColor = MaterialTheme.colorScheme.primary,
-                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                text = { Text("Jaat Chart") }
-                            )
-                            Tab(
-                                selected = selectedTabIndex == 2,
-                                onClick = { selectedTabIndex = 2 },
-                                selectedContentColor = MaterialTheme.colorScheme.primary,
-                                unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                text = { Text(stringResource(R.string.tab_album)) }
-                            )
-
-                        }
+                            onTabSelected = { selectedTabIndex = it },
+                            pureBlack = pureBlack
+                        )
                     }
                 }
             }
@@ -479,22 +469,12 @@ fun SearchScreen(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    
                     if (isPlayerExpanded) {
                         keyboardController?.hide()
                         focusManager.clearFocus()
-                    } else if (isFirstLaunch) {
-                        
-                        try {
-                            focusRequester.requestFocus()
-                        } catch (e: Exception) {
-                            
-                        }
-                        isFirstLaunch = false
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    
                     focusManager.clearFocus()
                     keyboardController?.hide()
                 }
@@ -651,6 +631,198 @@ fun AlbumsTabContent(
                             },
                         )
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchGlassDock(
+    selectedTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
+    pureBlack: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val (searchGyroPuckEnabled) = rememberPreference(
+        com.krish.jaatplayer.constants.SearchGyroPuckEnabledKey,
+        defaultValue = false
+    )
+
+    val glassConfig = LocalGlassEffectConfig.current
+    val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassSupported()
+    val dockShape = RoundedCornerShape(percent = 50)
+
+    val dockBackgroundModifier = if (useGlass) {
+        Modifier.liquidGlass(config = glassConfig, shape = dockShape)
+    } else {
+        Modifier.background(
+            if (pureBlack) Color.Black.copy(alpha = 0.85f)
+            else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
+            dockShape
+        )
+    }
+
+    val tabs = listOf(
+        R.drawable.explore_outlined to stringResource(R.string.tab_explore),
+        R.drawable.trending_up to "Jaat Chart",
+        R.drawable.album to stringResource(R.string.tab_album)
+    )
+
+    var containerWidthPx by remember { mutableFloatStateOf(0f) }
+    val tabsCount = tabs.size
+    val tabWidthPx = if (tabsCount > 0 && containerWidthPx > 0f) containerWidthPx / tabsCount else 1f
+
+    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+
+    val animatedIndex by animateFloatAsState(
+        targetValue = if (isDragging) {
+            (selectedTabIndex + (dragOffsetPx / tabWidthPx.coerceAtLeast(1f))).coerceIn(0f, (tabsCount - 1).toFloat())
+        } else {
+            selectedTabIndex.toFloat()
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "animatedIndex"
+    )
+
+    DisposableEffect(searchGyroPuckEnabled, selectedTabIndex, tabsCount) {
+        if (!searchGyroPuckEnabled) return@DisposableEffect onDispose {}
+
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
+            ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        if (sensorManager == null || sensor == null) return@DisposableEffect onDispose {}
+
+        var lastTargetIndex = selectedTabIndex
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                event ?: return
+                val xTilt = -event.values[0]
+                if (kotlin.math.abs(xTilt) > 3.8f) {
+                    val targetIndex = if (xTilt > 0) (selectedTabIndex + 1).coerceAtMost(tabsCount - 1) else (selectedTabIndex - 1).coerceAtLeast(0)
+                    if (targetIndex != lastTargetIndex) {
+                        lastTargetIndex = targetIndex
+                        onTabSelected(targetIndex)
+                    }
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+
+        onDispose {
+            sensorManager.unregisterListener(listener)
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(dockShape)
+                .then(dockBackgroundModifier)
+                .border(
+                    width = 1.dp,
+                    color = if (useGlass) glassConfig.textColor.copy(alpha = 0.25f)
+                    else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                    shape = dockShape
+                )
+                .padding(4.dp)
+                .onGloballyPositioned { coordinates ->
+                    containerWidthPx = coordinates.size.width.toFloat()
+                }
+        ) {
+            val density = LocalDensity.current
+            val tabWidthDp = with(density) { tabWidthPx.toDp() }
+
+            if (containerWidthPx > 0f) {
+                Box(
+                    modifier = Modifier
+                        .offset { IntOffset((animatedIndex * tabWidthPx).roundToInt(), 0) }
+                        .width(tabWidthDp)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                isDragging = true
+                                dragOffsetPx = 0f
+                            },
+                            onDragEnd = {
+                                val targetIndex = (selectedTabIndex + (dragOffsetPx / tabWidthPx.coerceAtLeast(1f))).roundToInt().coerceIn(0, tabsCount - 1)
+                                isDragging = false
+                                dragOffsetPx = 0f
+                                onTabSelected(targetIndex)
+                            },
+                            onDragCancel = {
+                                isDragging = false
+                                dragOffsetPx = 0f
+                            },
+                            onHorizontalDrag = { _, dragAmount ->
+                                dragOffsetPx += dragAmount
+                            }
+                        )
+                    },
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                tabs.forEachIndexed { index, (iconRes, label) ->
+                    val isSelected = selectedTabIndex == index
+
+                    val contentColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = tween(200),
+                        label = "contentColor"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .height(40.dp)
+                            .clip(RoundedCornerShape(percent = 50))
+                            .clickable {
+                                onTabSelected(index)
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(iconRes),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = contentColor
+                            )
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                ),
+                                color = contentColor
+                            )
+                        }
+                    }
+                }
             }
         }
     }

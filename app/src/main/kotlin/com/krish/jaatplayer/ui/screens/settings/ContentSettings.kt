@@ -72,6 +72,7 @@ import com.krish.jaatplayer.constants.EnableLrcLibKey
 import com.krish.jaatplayer.constants.EnableSimpMusicKey
 import com.krish.jaatplayer.constants.EnableYouLyPlusKey
 import com.krish.jaatplayer.constants.EnablePaxsenixKey
+import com.krish.jaatplayer.constants.EnableMusixmatchKey
 import com.krish.jaatplayer.constants.HideExplicitKey
 import com.krish.jaatplayer.constants.HideVideoSongsKey
 import com.krish.jaatplayer.constants.HideYoutubeShortsKey
@@ -154,6 +155,7 @@ highlightKey: String? = null) {
     val (enableSimpMusic, onEnableSimpMusicChange) = rememberPreference(key = EnableSimpMusicKey, defaultValue = true)
     val (enableYouLyPlus, onEnableYouLyPlusChange) = rememberPreference(key = EnableYouLyPlusKey, defaultValue = true)
     val (enablePaxsenix, onEnablePaxsenixChange) = rememberPreference(key = EnablePaxsenixKey, defaultValue = true)
+    val (enableMusixmatch, onEnableMusixmatchChange) = rememberPreference(key = EnableMusixmatchKey, defaultValue = true)
     val (lyricsProviderOrder, onLyricsProviderOrderChange) = rememberPreference(
         key = LyricsProviderOrderKey,
         defaultValue = "",
@@ -372,6 +374,7 @@ highlightKey: String? = null) {
             "SimpMusic".takeIf { enableSimpMusic },
             "YouLyPlus".takeIf { enableYouLyPlus },
             "Paxsenix".takeIf { enablePaxsenix },
+            "Musixmatch".takeIf { enableMusixmatch },
         )
 
         
@@ -1103,6 +1106,28 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { onEnablePaxsenixChange(!enablePaxsenix) }
+                ),
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == "Musixmatch"),
+                    icon = painterResource(R.drawable.lyrics),
+                    title = { Text("Musixmatch") },
+                    description = { Text("Large synced lyrics catalog (synced first, plain text fallback)") },
+                    trailingContent = {
+                        Switch(
+                            checked = enableMusixmatch,
+                            onCheckedChange = onEnableMusixmatchChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (enableMusixmatch) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onEnableMusixmatchChange(!enableMusixmatch) }
                 ),
                 Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.lyrics_provider_priority)),

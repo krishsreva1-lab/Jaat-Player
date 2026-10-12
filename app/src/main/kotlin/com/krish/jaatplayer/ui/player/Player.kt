@@ -2370,6 +2370,9 @@ fun BottomSheetPlayer(
                 )
             }
 
+            com.krish.jaatplayer.ui.component.DjReadout(
+                modifier = Modifier.padding(horizontal = PlayerHorizontalPadding, vertical = 2.dp)
+            )
             automixDebugOverlay()
             jaatStylesDebugOverlay()
 

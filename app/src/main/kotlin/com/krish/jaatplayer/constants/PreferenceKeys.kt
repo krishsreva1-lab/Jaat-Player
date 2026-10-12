@@ -29,6 +29,7 @@ val EnableDynamicIconKey = booleanPreferencesKey("enableDynamicIcon")
 val EnableLegacyIconKey = booleanPreferencesKey("enableLegacyIcon")
 val EnableHighRefreshRateKey = booleanPreferencesKey("enableHighRefreshRate")
 val EnableHapticsKey = booleanPreferencesKey("enableHaptics")
+val SearchGyroPuckEnabledKey = booleanPreferencesKey("searchGyroPuckEnabled")
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
 val SelectedThemeColorKey = intPreferencesKey("selectedThemeColor")
 val DarkModeKey = stringPreferencesKey("darkMode")
@@ -94,6 +95,7 @@ val EnableBetterLyricsKey = booleanPreferencesKey("enableBetterLyrics")
 val EnableSimpMusicKey = booleanPreferencesKey("enableSimpMusic")
 val EnableYouLyPlusKey = booleanPreferencesKey("enableYouLyPlus")
 val EnablePaxsenixKey = booleanPreferencesKey("enablePaxsenix")
+val EnableMusixmatchKey = booleanPreferencesKey("enableMusixmatch")
 val HideExplicitKey = booleanPreferencesKey("hideExplicit")
 val SponsorBlockEnabledKey = booleanPreferencesKey("sponsor_block_enabled")
 val HideVideoSongsKey = booleanPreferencesKey("hideVideoSongs")
@@ -143,6 +145,15 @@ val DisableLoadMoreWhenRepeatAllKey = booleanPreferencesKey("disableLoadMoreWhen
 val AutoDownloadOnLikeKey = booleanPreferencesKey("autoDownloadOnLike")
 /** Shows a floating "Dynamic Island" style pill over other apps while music plays and this app is backgrounded. Needs the SYSTEM_ALERT_WINDOW overlay permission. */
 val DynamicIslandEnabledKey = booleanPreferencesKey("dynamicIslandEnabled")
+val DynamicIslandStyleKey = stringPreferencesKey("dynamicIslandExpandedStyle")
+val DynamicIslandExpandedStyleKey = DynamicIslandStyleKey
+
+enum class DynamicIslandStyle {
+    BLURRED_ART,
+    GRADIENT,
+}
+val AodPixelShiftEnabledKey = booleanPreferencesKey("aodPixelShiftEnabled")
+val AodDimLevelKey = floatPreferencesKey("aodDimLevel")
 val SimilarContent = booleanPreferencesKey("similarContent")
 val AutoSkipNextOnErrorKey = booleanPreferencesKey("autoSkipNextOnError")
 val StopMusicOnTaskClearKey = booleanPreferencesKey("stopMusicOnTaskClear")
@@ -151,6 +162,9 @@ val PreventDuplicateTracksInQueueKey = booleanPreferencesKey("preventDuplicateTr
 val CrossfadeEnabledKey = booleanPreferencesKey("crossfadeEnabled")
 val CrossfadeDurationKey = floatPreferencesKey("crossfadeDuration")
 val CrossfadeGaplessKey = booleanPreferencesKey("crossfadeGapless")
+val ManualCrossfadeEnabledKey = booleanPreferencesKey("manualCrossfadeEnabled")
+val CreativeTransitionsEnabledKey = booleanPreferencesKey("creativeTransitionsEnabled")
+val ManualCrossfadeDurationKey = floatPreferencesKey("manualCrossfadeDuration")
 val AutomixCrossfadeKey = booleanPreferencesKey("automixCrossfade")
 val AutomixDebugOverlayKey = booleanPreferencesKey("automixDebugOverlay")
 

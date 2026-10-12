@@ -149,6 +149,13 @@ highlightKey: String? = null) {
                         subtitle = "t.me/jaatplayerr",
                         onClick = { uriHandler.openUri("https://t.me/jaatplayerr") },
                     )
+                    AboutDivider()
+                    AboutActionRow(
+                        icon = painterResource(R.drawable.ic_discord_new),
+                        title = "Discord Server",
+                        subtitle = "discord.gg/8tEpMnPD7S",
+                        onClick = { uriHandler.openUri("https://discord.gg/8tEpMnPD7S") },
+                    )
                 }
             }
 

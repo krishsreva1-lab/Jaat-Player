@@ -89,6 +89,8 @@ import com.krish.jaatplayer.utils.cipher.PlayerConfigStore
 import com.krish.jaatplayer.utils.cipher.PlayerDatesStore
 import kotlinx.coroutines.launch
 import android.text.format.DateUtils
+import com.krish.jaatplayer.constants.DynamicIslandStyle
+import com.krish.jaatplayer.constants.DynamicIslandStyleKey
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,6 +112,18 @@ highlightKey: String? = null) {
     val (crossfadeDuration, onCrossfadeDurationChange) = rememberPreference(
         CrossfadeDurationKey,
         defaultValue = 5f
+    )
+    val (manualCrossfadeEnabled, onManualCrossfadeEnabledChange) = rememberPreference(
+        com.krish.jaatplayer.constants.ManualCrossfadeEnabledKey,
+        defaultValue = false
+    )
+    val (manualCrossfadeDuration, onManualCrossfadeDurationChange) = rememberPreference(
+        com.krish.jaatplayer.constants.ManualCrossfadeDurationKey,
+        defaultValue = 3f
+    )
+    val (creativeTransitions, onCreativeTransitionsChange) = rememberPreference(
+        com.krish.jaatplayer.constants.CreativeTransitionsEnabledKey,
+        defaultValue = false
     )
     val (automixCrossfade, onAutomixCrossfadeChange) = rememberPreference(
         AutomixCrossfadeKey,
@@ -199,10 +213,11 @@ highlightKey: String? = null) {
         AutoDownloadOnLikeKey,
         defaultValue = false
     )
-    val (dynamicIslandEnabled, onDynamicIslandEnabledChange) = rememberPreference(
-        com.krish.jaatplayer.constants.DynamicIslandEnabledKey,
-        defaultValue = false
+    val (aodPixelShiftEnabled, onAodPixelShiftEnabledChange) = rememberPreference(
+        com.krish.jaatplayer.constants.AodPixelShiftEnabledKey,
+        defaultValue = true
     )
+    var showAodScreen by remember { mutableStateOf(false) }
     val (similarContentEnabled, similarContentEnabledChange) = rememberPreference(
         key = SimilarContent,
         defaultValue = true
@@ -418,7 +433,7 @@ highlightKey: String? = null) {
 
         Material3SettingsGroup(
             scrollState = scrollState,
-            title = "Data Saver",
+            title = "Audio Quality & Lossless",
             items = buildList {
                 add(Material3SettingsItem(
                     isHighlighted = (highlightKey == "Data Saver Mode (Beta)"),
@@ -442,14 +457,8 @@ highlightKey: String? = null) {
                     },
                     onClick = { onDataSaverEnabledChange(!dataSaverEnabled) }
                 ))
-            }
-        )
-
-        Material3SettingsGroup(scrollState = scrollState, 
-            title = stringResource(R.string.player),
-            items = buildList {
                 add(Material3SettingsItem(
-    isHighlighted = (highlightKey == stringResource(R.string.audio_quality)),
+                    isHighlighted = (highlightKey == stringResource(R.string.audio_quality)),
                     icon = painterResource(R.drawable.graphic_eq),
                     title = { Text(stringResource(R.string.audio_quality)) },
                     description = {
@@ -462,9 +471,8 @@ highlightKey: String? = null) {
                     },
                     onClick = { showAudioQualityDialog = true }
                 ))
-                
                 add(Material3SettingsItem(
-    isHighlighted = (highlightKey == stringResource(R.string.download_quality_title)),
+                    isHighlighted = (highlightKey == stringResource(R.string.download_quality_title)),
                     icon = painterResource(R.drawable.download),
                     title = { Text(stringResource(R.string.download_quality_title)) },
                     description = {
@@ -477,8 +485,14 @@ highlightKey: String? = null) {
                     },
                     onClick = { showDownloadQualityDialog = true }
                 ))
+            }
+        )
 
+        Spacer(modifier = Modifier.height(27.dp))
 
+        Material3SettingsGroup(scrollState = scrollState, 
+            title = "Crossfade & Transitions",
+            items = buildList {
                 val isLosslessSelected = audioQuality == AudioQuality.LOSSLESS
                 add(Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.crossfade)),
@@ -589,6 +603,28 @@ highlightKey: String? = null) {
                     ))
                     if (automixCrossfade) {
                         add(Material3SettingsItem(
+                            isHighlighted = highlightKey == "Creative Transitions",
+                            icon = painterResource(R.drawable.graphic_eq),
+                            title = { Text("Creative transitions") },
+                            description = { Text("Occasionally end a song with an echo freeze or a tape stop instead of a plain blend") },
+                            trailingContent = {
+                                Switch(
+                                    checked = creativeTransitions,
+                                    onCheckedChange = onCreativeTransitionsChange,
+                                    thumbContent = {
+                                        Icon(
+                                            painter = painterResource(
+                                                id = if (creativeTransitions) R.drawable.check else R.drawable.close
+                                            ),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(SwitchDefaults.IconSize)
+                                        )
+                                    }
+                                )
+                            },
+                            onClick = { onCreativeTransitionsChange(!creativeTransitions) }
+                        ))
+                        add(Material3SettingsItem(
                             isHighlighted = highlightKey == stringResource(R.string.automix_debug),
                             icon = painterResource(R.drawable.bug_report),
                             title = { Text(stringResource(R.string.automix_debug)) },
@@ -632,6 +668,53 @@ highlightKey: String? = null) {
                             )
                         },
                         onClick = { onJaatStylesDebugOverlayChange(!jaatStylesDebugOverlay) }
+                    ))
+                }
+                add(Material3SettingsItem(
+                    isHighlighted = (highlightKey == "Manual Crossfade"),
+                    icon = painterResource(R.drawable.skip_next),
+                    title = { Text("Manual crossfade") },
+                    description = {
+                        if (isLosslessSelected) {
+                            Text("Not available while using Lossless")
+                        } else {
+                            Text("Blend songs smoothly when you tap Next or Previous")
+                        }
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = !isLosslessSelected && manualCrossfadeEnabled,
+                            enabled = !isLosslessSelected,
+                            onCheckedChange = onManualCrossfadeEnabledChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (!isLosslessSelected && manualCrossfadeEnabled) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { if (!isLosslessSelected) onManualCrossfadeEnabledChange(!manualCrossfadeEnabled) }
+                ))
+                if (manualCrossfadeEnabled && !isLosslessSelected) {
+                    add(Material3SettingsItem(
+                        isHighlighted = (highlightKey == "Manual Crossfade Duration"),
+                        icon = painterResource(R.drawable.timer),
+                        title = { Text("Manual crossfade duration") },
+                        description = {
+                            Column {
+                                Text(pluralStringResource(R.plurals.seconds, manualCrossfadeDuration.toInt(), manualCrossfadeDuration.toInt()))
+                                Slider(
+                                    value = manualCrossfadeDuration,
+                                    onValueChange = onManualCrossfadeDurationChange,
+                                    valueRange = 1f..10f,
+                                    steps = 8
+                                )
+                            }
+                        }
                     ))
                 }
                 add(Material3SettingsItem(
@@ -961,38 +1044,6 @@ highlightKey: String? = null) {
                     onClick = { onAutoDownloadOnLikeChange(!autoDownloadOnLike) }
                 ),
                 Material3SettingsItem(
-                    icon = painterResource(R.drawable.music_note),
-                    title = { Text("Dynamic Island") },
-                    description = { Text("Show a floating player pill at the top of the screen when you leave the app while music is playing. Tap it to expand controls, swipe up to hide.") },
-                    trailingContent = {
-                        Switch(
-                            checked = dynamicIslandEnabled,
-                            onCheckedChange = { enabled ->
-                                if (enabled && !android.provider.Settings.canDrawOverlays(context)) {
-                                    // Overlay permission can only be granted from system settings.
-                                    context.startActivity(
-                                        Intent(
-                                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                            Uri.parse("package:" + context.packageName)
-                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    )
-                                }
-                                onDynamicIslandEnabledChange(enabled)
-                            },
-                            thumbContent = {
-                                Icon(
-                                    painter = painterResource(
-                                        id = if (dynamicIslandEnabled) R.drawable.check else R.drawable.close
-                                    ),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(SwitchDefaults.IconSize)
-                                )
-                            }
-                        )
-                    },
-                    onClick = { onDynamicIslandEnabledChange(!dynamicIslandEnabled) }
-                ),
-                Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.enable_similar_content)),
                     icon = painterResource(R.drawable.similar),
                     title = { Text(stringResource(R.string.enable_similar_content)) },
@@ -1251,9 +1302,51 @@ highlightKey: String? = null) {
                 ),
             )
         )
+        Spacer(modifier = Modifier.height(27.dp))
+
+        Material3SettingsGroup(scrollState = scrollState,
+            title = "Always-On Display (AOD)",
+            items = listOf(
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == "AOD Pixel Shift"),
+                    icon = painterResource(R.drawable.sync),
+                    title = { Text("AMOLED Pixel Shift") },
+                    description = { Text("Periodically drifts content position to prevent display burn-in") },
+                    trailingContent = {
+                        Switch(
+                            checked = aodPixelShiftEnabled,
+                            onCheckedChange = onAodPixelShiftEnabledChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (aodPixelShiftEnabled) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onAodPixelShiftEnabledChange(!aodPixelShiftEnabled) }
+                ),
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == "AOD Standby Screen"),
+                    icon = painterResource(R.drawable.bedtime),
+                    title = { Text("Launch Standby / AOD Screen") },
+                    description = { Text("Pure black AMOLED standby clock with glowing art, double-tap play/pause and swipe to skip") },
+                    onClick = { showAodScreen = true }
+                ),
+            )
+        )
         Spacer(modifier = Modifier.height(16.dp))
     
         Spacer(Modifier.windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom)))
+    }
+
+    if (showAodScreen) {
+        com.krish.jaatplayer.ui.screens.AodScreen(
+            onDismiss = { showAodScreen = false }
+        )
     }
 
     TopAppBar(

@@ -139,6 +139,9 @@ fun AppFloatingNavBar(
             backgroundColor = backgroundColor,
             accessoryBackgroundColor = backgroundColor,
         ),
+        // Glass puck: samples the app backdrop for lens refraction (flat puck when glass is off).
+        backdrop = if (useGlass) LocalAppBackdrop.current else null,
+        accentColor = adaptiveTextColor,
         // The tab content lambdas are captured once per contentKey, so anything they
         // close over (selection, colors) must be part of the key to avoid stale UI.
         contentKey = listOf(selectedTabKey, navigationItems, selectedContentColor, unselectedContentColor),

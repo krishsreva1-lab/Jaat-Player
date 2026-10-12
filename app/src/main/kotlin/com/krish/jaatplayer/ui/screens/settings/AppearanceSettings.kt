@@ -5,7 +5,9 @@ package com.krish.jaatplayer.ui.screens.settings
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.border
 import androidx.core.content.edit
 import androidx.compose.foundation.clickable
@@ -132,6 +134,9 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import com.krish.jaatplayer.constants.LyricsClickKey
 import com.krish.jaatplayer.constants.AppleMusicLyricsBlurKey
+import com.krish.jaatplayer.constants.DynamicIslandEnabledKey
+import com.krish.jaatplayer.constants.DynamicIslandStyle
+import com.krish.jaatplayer.constants.DynamicIslandStyleKey
 import com.krish.jaatplayer.constants.LyricsGlowEffectKey
 import com.krish.jaatplayer.constants.LyricsLineSpacingKey
 import com.krish.jaatplayer.constants.LyricsScrollKey
@@ -163,6 +168,10 @@ highlightKey: String? = null) {
     )
     val (enableHaptics, onEnableHapticsChange) = rememberPreference(
         com.krish.jaatplayer.constants.EnableHapticsKey,
+        defaultValue = false
+    )
+    val (searchGyroPuckEnabled, onSearchGyroPuckEnabledChange) = rememberPreference(
+        com.krish.jaatplayer.constants.SearchGyroPuckEnabledKey,
         defaultValue = false
     )
     val (selectedThemeColorInt) = rememberPreference(
@@ -223,6 +232,35 @@ highlightKey: String? = null) {
             MiniPlayerBackgroundStyleKey,
             defaultValue = PlayerBackgroundStyle.DEFAULT,
         )
+
+    val (dynamicIslandEnabled, onDynamicIslandEnabledChange) = rememberPreference(
+        DynamicIslandEnabledKey,
+        defaultValue = false
+    )
+    val (dynamicIslandStyle, onDynamicIslandStyleChange) = rememberEnumPreference(
+        DynamicIslandStyleKey,
+        defaultValue = DynamicIslandStyle.BLURRED_ART
+    )
+    var showDynamicIslandStyleDialog by remember { mutableStateOf(false) }
+
+    if (showDynamicIslandStyleDialog) {
+        EnumDialog(
+            onDismiss = { showDynamicIslandStyleDialog = false },
+            onSelect = { style ->
+                onDynamicIslandStyleChange(style)
+                showDynamicIslandStyleDialog = false
+            },
+            title = "Dynamic Island Style",
+            current = dynamicIslandStyle,
+            values = DynamicIslandStyle.entries,
+            valueText = { style ->
+                when (style) {
+                    DynamicIslandStyle.BLURRED_ART -> "Blurred Album Art"
+                    DynamicIslandStyle.GRADIENT -> "Gradient Accent"
+                }
+            }
+        )
+    }
 
     val (defaultOpenTab, onDefaultOpenTabChange) = rememberEnumPreference(
         DefaultOpenTabKey,
@@ -1498,6 +1536,53 @@ highlightKey: String? = null) {
                             }
                         )
                     },
+                    onClick = { onShowCodecOnPlayerChange(!showCodecOnPlayer) }
+                ),
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == "Dynamic Island"),
+                    icon = painterResource(R.drawable.music_note),
+                    title = { Text("Dynamic Island") },
+                    description = { Text("Show a floating player pill at the top of the screen when you leave the app while music is playing. Tap it to expand controls, swipe up to hide.") },
+                    trailingContent = {
+                        Switch(
+                            checked = dynamicIslandEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled && !Settings.canDrawOverlays(context)) {
+                                    context.startActivity(
+                                        Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:" + context.packageName)
+                                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                                onDynamicIslandEnabledChange(enabled)
+                            },
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (dynamicIslandEnabled) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onDynamicIslandEnabledChange(!dynamicIslandEnabled) }
+                ),
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == "Dynamic Island Style"),
+                    icon = painterResource(R.drawable.palette),
+                    title = { Text("Dynamic Island Style") },
+                    description = {
+                        Text(
+                            when (dynamicIslandStyle) {
+                                DynamicIslandStyle.BLURRED_ART -> "Blurred Album Art"
+                                DynamicIslandStyle.GRADIENT -> "Gradient Accent"
+                            }
+                        )
+                    },
+                    onClick = { showDynamicIslandStyleDialog = true }
                 ),
                 if (swipeThumbnail) Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.swipe_sensitivity)),
@@ -1909,6 +1994,28 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { onEnableHapticsChange(!enableHaptics) }
+                ),
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == "Search Dock Gyro Motion"),
+                    icon = painterResource(R.drawable.speed),
+                    title = { Text("Search Dock Gyro Motion") },
+                    description = { Text("Tilt phone left or right to slide the search category puck") },
+                    trailingContent = {
+                        Switch(
+                            checked = searchGyroPuckEnabled,
+                            onCheckedChange = onSearchGyroPuckEnabledChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (searchGyroPuckEnabled) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onSearchGyroPuckEnabledChange(!searchGyroPuckEnabled) }
                 ),
                 Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.swipe_song_to_remove)),

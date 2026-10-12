@@ -52,6 +52,10 @@ data class GlassEffectConfig(
     val miniPlayerEnabled: Boolean = true,
     val navBarEnabled: Boolean = true,
     val menuEnabled: Boolean = true,
+    /** Resting wash of the nav bar's draggable selection puck. [Color.Unspecified] follows the theme. */
+    val puckColor: Color = Color.Unspecified,
+    /** Resting opacity (0..1) of the puck wash. */
+    val puckOpacity: Float = 0.8f,
 ) {
     /**
      * Whether the glass effect should be rendered for [component], taking the master

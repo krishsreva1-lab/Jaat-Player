@@ -11,6 +11,7 @@ object LyricsProviderRegistry {
         "Paxsenix"        to PaxSenixLyricsProvider,
         "BetterLyrics"    to BetterLyricsProvider,
         "Unison"          to UnisonLyricsProvider,
+        "Musixmatch"      to MusixmatchLyricsProvider,
         "SimpMusic"       to SimpMusicLyricsProvider,
         "LrcLib"          to LrcLibLyricsProvider,
         "Kugou"           to KuGouLyricsProvider,
@@ -34,6 +35,7 @@ object LyricsProviderRegistry {
         "YouLyPlus",
         "Paxsenix",
         "Unison",
+        "Musixmatch",
         "BetterLyrics",
         "SimpMusic",
         "LrcLib",
@@ -42,8 +44,12 @@ object LyricsProviderRegistry {
         "YouTubeMusic",
     )
 
-    fun getOrderedProviders(orderString: String): List<LyricsProvider> =
-        deserializeProviderOrder(orderString).mapNotNull { getProviderByName(it) }
+    fun getOrderedProviders(orderString: String): List<LyricsProvider> {
+        val names = deserializeProviderOrder(orderString)
+        // Musixmatch was added after some users already saved a custom order; append it so it still runs for them.
+        val withMusixmatch = if ("Musixmatch" in names) names else names + "Musixmatch"
+        return withMusixmatch.mapNotNull { getProviderByName(it) }
+    }
 
     
     fun getProviderNameForEnum(enum: PreferredLyricsProvider): String = when (enum) {
@@ -62,6 +68,7 @@ object LyricsProviderRegistry {
         "Paxsenix"        -> "PaxSenix"
         "BetterLyrics"    -> "Better Lyrics"
         "Unison"          -> "Unison"
+        "Musixmatch"      -> "Musixmatch"
         "SimpMusic"       -> "SimpMusic"
         "LrcLib"          -> "LrcLib"
         "Kugou"           -> "KuGou"

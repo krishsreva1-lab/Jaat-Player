@@ -55,6 +55,7 @@ import com.krish.jaatplayer.ui.screens.Screens
 import com.krish.jaatplayer.ui.utils.backToMain
 import com.krish.jaatplayer.jaat.updater.getUpdateAvailableState
 import com.krish.jaatplayer.ui.component.SupportProjectCard
+import com.krish.jaatplayer.utils.AppLogo
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -132,195 +133,163 @@ highlightKey: String? = null) {
                 .padding(start = 8.dp, end = 8.dp, bottom = 16.dp)
         )
 
-        val itemsList = buildList {
-            if (accountText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == accountText),
-                        icon = painterResource(R.drawable.account),
-                        title = { Text(accountText) },
-                        onClick = { navController.navigate("settings/account") }
-                    )
-                )
-            }
+        val contributeLosslessText = stringResource(R.string.contribute_to_lossless)
 
-            if (aiLyricsText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-                        isHighlighted = (highlightKey == aiLyricsText),
-                        customIcon = {
-                            Text(
-                                text = "Ai",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                                color = if (highlightKey == aiLyricsText)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                            )
-                        },
-                        title = { Text(aiLyricsText) },
-                        onClick = { navController.navigate("settings/ai") }
-                    )
-                )
-            }
+        val accountItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == accountText),
+            icon = painterResource(R.drawable.account),
+            title = { Text(accountText) },
+            onClick = { navController.navigate("settings/account") }
+        )
 
-            val contributeLosslessText = stringResource(R.string.contribute_to_lossless)
-            if (contributeLosslessText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-                        isHighlighted = (highlightKey == contributeLosslessText),
-                        customIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_apple_lossless),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = if (highlightKey == contributeLosslessText)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                            )
-                        },
-                        title = { Text(contributeLosslessText) },
-                        onClick = { navController.navigate("settings/lossless") }
-                    )
-                )
-            }
+        val listenTogetherItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == listenTogetherText),
+            icon = painterResource(R.drawable.group),
+            title = { Text(listenTogetherText) },
+            onClick = { navController.navigate(Screens.ListenTogether.route) }
+        )
 
-            if (appearanceText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == appearanceText),
-                        icon = painterResource(R.drawable.palette),
-                        title = { Text(appearanceText) },
-                        onClick = { navController.navigate("settings/appearance") }
-                    )
-                )
-            }
-            if (playerText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == playerText),
-                        icon = painterResource(R.drawable.play),
-                        title = { Text(playerText) },
-                        onClick = { navController.navigate("settings/player") }
-                    )
-                )
-            }
-            if (listenTogetherText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == listenTogetherText),
-                        icon = painterResource(R.drawable.group),
-                        title = { Text(listenTogetherText) },
-                        onClick = { navController.navigate(Screens.ListenTogether.route) }
-                    )
-                )
-            }
-            if (contentText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == contentText),
-                        icon = painterResource(R.drawable.language),
-                        title = { Text(contentText) },
-                        onClick = { navController.navigate("settings/content") }
-                    )
-                )
-            }
+        val playerItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == playerText),
+            icon = painterResource(R.drawable.play),
+            title = { Text(playerText) },
+            onClick = { navController.navigate("settings/player") }
+        )
 
-            if (privacyText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == privacyText),
-                        icon = painterResource(R.drawable.security),
-                        title = { Text(privacyText) },
-                        onClick = { navController.navigate("settings/privacy") }
-                    )
+        val contentItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == contentText),
+            icon = painterResource(R.drawable.language),
+            title = { Text(contentText) },
+            onClick = { navController.navigate("settings/content") }
+        )
+
+        val aiItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == aiLyricsText),
+            customIcon = {
+                Text(
+                    text = "Ai",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (highlightKey == aiLyricsText)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
                 )
-            }
-            if (storageText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == storageText),
-                        icon = painterResource(R.drawable.storage),
-                        title = { Text(storageText) },
-                        onClick = { navController.navigate("settings/storage") }
-                    )
+            },
+            title = { Text(aiLyricsText) },
+            onClick = { navController.navigate("settings/ai") }
+        )
+
+        val losslessItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == contributeLosslessText),
+            customIcon = {
+                Icon(
+                    painter = painterResource(R.drawable.ic_apple_lossless),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = if (highlightKey == contributeLosslessText)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
                 )
-            }
-            if (backupText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == backupText),
-                        icon = painterResource(R.drawable.restore),
-                        title = { Text(backupText) },
-                        onClick = { navController.navigate("settings/backup_restore") }
-                    )
-                )
-            }
-            if (systemUpdateText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == systemUpdateText),
-                        icon = painterResource(if (isUpdateAvailable) com.krish.jaatplayer.utils.AppLogo.glyphRes() else R.drawable.update),
-                        title = { Text(systemUpdateText) },
-                        description = if (isUpdateAvailable) {
-                            {
-                                Text(
-                                    text = stringResource(R.string.update_available),
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        } else null,
-                        onClick = { navController.navigate("settings/update") }
-                    )
-                )
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if ("supported links".contains(searchLower)) {
-                    add(
-                        Material3SettingsItem(
-                            isHighlighted = (highlightKey == "supported links"),
-                            icon = painterResource(R.drawable.link),
-                            title = { Text("Supported Links") },
-                            onClick = {
-                                try {
-                                    val intent = Intent(
-                                        Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS,
-                                        Uri.parse("package:${context.packageName}")
-                                    )
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    when (e) {
-                                        is ActivityNotFoundException, is SecurityException -> {
-                                            Toast.makeText(context, "Cannot open settings", Toast.LENGTH_SHORT).show()
-                                        }
-                                        else -> {
-                                            Toast.makeText(context, "An error occurred", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                }
-                            }
-                        )
+            },
+            title = { Text(contributeLosslessText) },
+            onClick = { navController.navigate("settings/lossless") }
+        )
+
+        val appearanceItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == appearanceText),
+            icon = painterResource(R.drawable.palette),
+            title = { Text(appearanceText) },
+            onClick = { navController.navigate("settings/appearance") }
+        )
+
+        val privacyItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == privacyText),
+            icon = painterResource(R.drawable.security),
+            title = { Text(privacyText) },
+            onClick = { navController.navigate("settings/privacy") }
+        )
+
+        val storageItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == storageText),
+            icon = painterResource(R.drawable.storage),
+            title = { Text(storageText) },
+            onClick = { navController.navigate("settings/storage") }
+        )
+
+        val backupItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == backupText),
+            icon = painterResource(R.drawable.restore),
+            title = { Text(backupText) },
+            onClick = { navController.navigate("settings/backup_restore") }
+        )
+
+        val systemUpdateItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == systemUpdateText),
+            icon = painterResource(if (isUpdateAvailable) AppLogo.glyphRes() else R.drawable.update),
+            title = { Text(systemUpdateText) },
+            description = if (isUpdateAvailable) {
+                {
+                    Text(
+                        text = stringResource(R.string.update_available),
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
-            }
-            if (aboutText.lowercase().contains(searchLower)) {
-                add(
-                    Material3SettingsItem(
-    isHighlighted = (highlightKey == aboutText),
-                        icon = painterResource(R.drawable.info),
-                        title = { Text(aboutText) },
-                        onClick = { navController.navigate("settings/about") }
+            } else null,
+            onClick = { navController.navigate("settings/update") }
+        )
+
+        val supportedLinksItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == "supported links"),
+            icon = painterResource(R.drawable.link),
+            title = { Text("Supported Links") },
+            onClick = {
+                try {
+                    val intent = Intent(
+                        Settings.ACTION_APP_OPEN_BY_DEFAULT_SETTINGS,
+                        Uri.parse("package:${context.packageName}")
                     )
-                )
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    when (e) {
+                        is ActivityNotFoundException, is SecurityException -> {
+                            Toast.makeText(context, "Cannot open settings", Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            Toast.makeText(context, "An error occurred", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
             }
-        }
+        )
 
-        val finalItemsList = if (searchQuery.isNotEmpty()) {
+        val aboutItem = Material3SettingsItem(
+            isHighlighted = (highlightKey == aboutText),
+            icon = painterResource(R.drawable.info),
+            title = { Text(aboutText) },
+            onClick = { navController.navigate("settings/about") }
+        )
+
+        if (searchQuery.isNotEmpty()) {
+            val allMainItemsWithNames = buildList {
+                if (accountText.lowercase().contains(searchLower)) add(accountItem)
+                if (listenTogetherText.lowercase().contains(searchLower)) add(listenTogetherItem)
+                if (playerText.lowercase().contains(searchLower)) add(playerItem)
+                if (contentText.lowercase().contains(searchLower)) add(contentItem)
+                if (aiLyricsText.lowercase().contains(searchLower)) add(aiItem)
+                if (contributeLosslessText.lowercase().contains(searchLower)) add(losslessItem)
+                if (appearanceText.lowercase().contains(searchLower)) add(appearanceItem)
+                if (privacyText.lowercase().contains(searchLower)) add(privacyItem)
+                if (storageText.lowercase().contains(searchLower)) add(storageItem)
+                if (backupText.lowercase().contains(searchLower)) add(backupItem)
+                if (systemUpdateText.lowercase().contains(searchLower)) add(systemUpdateItem)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && "supported links".contains(searchLower)) add(supportedLinksItem)
+                if (aboutText.lowercase().contains(searchLower)) add(aboutItem)
+            }
+
             val subSettings = getAllSearchableSettings()
-
             val matchedSubSettings = subSettings
                 .filter { it.first.lowercase().contains(searchLower) }
                 .map { (title, parentTitle, route) ->
@@ -328,30 +297,86 @@ highlightKey: String? = null) {
                         icon = painterResource(R.drawable.search),
                         title = { Text(title) },
                         description = { Text(parentTitle) },
-                        onClick = { 
+                        onClick = {
                             val encodedTitle = android.net.Uri.encode(title)
                             val finalRoute = if (route.contains("?")) "$route&highlightKey=$encodedTitle" else "$route?highlightKey=$encodedTitle"
                             navController.navigate(finalRoute)
                         }
                     )
                 }
-            
-            itemsList + matchedSubSettings
-        } else {
-            itemsList
-        }
 
-        if (finalItemsList.isEmpty() && searchQuery.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(32.dp))
-            Text(
-                text = "No settings found for \"$searchQuery\"",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-            )
+            val combinedSearchResults = allMainItemsWithNames + matchedSubSettings
+
+            if (combinedSearchResults.isEmpty()) {
+                Spacer(modifier = Modifier.height(32.dp))
+                Text(
+                    text = "No settings found for \"$searchQuery\"",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                )
+            } else {
+                Material3SettingsGroup(
+                    title = "Search Results",
+                    scrollState = scrollState,
+                    items = combinedSearchResults
+                )
+            }
         } else {
-            Material3SettingsGroup(scrollState = scrollState, items = finalItemsList)
+            // Category 1: Account & Social
+            val accountSocialItems = listOf(accountItem, listenTogetherItem)
+            Material3SettingsGroup(
+                title = "Account & Social",
+                scrollState = scrollState,
+                items = accountSocialItems
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Category 2: Playback & Features
+            val playbackItems = listOf(playerItem, contentItem, aiItem, losslessItem)
+            Material3SettingsGroup(
+                title = "Playback & Features",
+                scrollState = scrollState,
+                items = playbackItems
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Category 3: Interface & Appearance
+            val appearanceItems = listOf(appearanceItem)
+            Material3SettingsGroup(
+                title = "Interface & Appearance",
+                scrollState = scrollState,
+                items = appearanceItems
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Category 4: Data & Privacy
+            val dataPrivacyItems = listOf(privacyItem, storageItem, backupItem)
+            Material3SettingsGroup(
+                title = "Data & Privacy",
+                scrollState = scrollState,
+                items = dataPrivacyItems
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Category 5: System & Info
+            val systemInfoItems = buildList {
+                add(systemUpdateItem)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    add(supportedLinksItem)
+                }
+                add(aboutItem)
+            }
+            Material3SettingsGroup(
+                title = "System & Info",
+                scrollState = scrollState,
+                items = systemInfoItems
+            )
         }
         
         Spacer(modifier = Modifier.height(50.dp))
