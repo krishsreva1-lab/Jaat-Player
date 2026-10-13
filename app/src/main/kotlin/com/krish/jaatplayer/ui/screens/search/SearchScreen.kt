@@ -49,6 +49,10 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import com.krish.jaatplayer.ui.component.GlassComponent
+import com.krish.jaatplayer.ui.component.LocalAppBackdrop
+import com.krish.jaatplayer.ui.component.backdrop.backdrops.layerBackdrop
+import com.krish.jaatplayer.ui.component.backdrop.backdrops.rememberLayerBackdrop
+import androidx.compose.runtime.CompositionLocalProvider
 import com.krish.jaatplayer.ui.component.LocalGlassEffectConfig
 import com.krish.jaatplayer.ui.component.backdrop.catalog.utils.DampedDragAnimation
 import com.krish.jaatplayer.ui.component.isGlassSupported
@@ -264,6 +268,16 @@ fun SearchScreen(
 
     val haptic = LocalHapticFeedback.current
 
+    // The glass dock must NOT sample the app-wide backdrop: that layer is recorded from the
+    // whole NavHost, which contains this screen and therefore the dock itself, so the dock
+    // would be drawing a layer that contains itself and crash. It gets its own layer that only
+    // records this screen's tab content (a sibling of the dock), same pattern as Player.kt.
+    val searchBackdropBase = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+    val searchBackdrop = rememberLayerBackdrop {
+        drawRect(searchBackdropBase)
+        drawContent()
+    }
+
     Scaffold(
         topBar = {
             Column(
@@ -435,11 +449,13 @@ fun SearchScreen(
                 ) {
                     Column {
                         Spacer(modifier = Modifier.height(8.dp))
-                        SearchGlassDock(
-                            selectedTabIndex = selectedTabIndex,
-                            onTabSelected = { selectedTabIndex = it },
-                            pureBlack = pureBlack
-                        )
+                        CompositionLocalProvider(LocalAppBackdrop provides searchBackdrop) {
+                            SearchGlassDock(
+                                selectedTabIndex = selectedTabIndex,
+                                onTabSelected = { selectedTabIndex = it },
+                                pureBlack = pureBlack
+                            )
+                        }
                     }
                 }
             }
@@ -452,6 +468,7 @@ fun SearchScreen(
             modifier = Modifier
                 .padding(top = paddingValues.calculateTopPadding())
                 .fillMaxSize()
+                .layerBackdrop(searchBackdrop)
         ) {
             if (!searchActive) {
                 val tabPadding = PaddingValues(bottom = bottomPadding)
@@ -649,6 +666,11 @@ private fun SearchGlassDock(
         defaultValue = false
     )
 
+    val (searchDockPuckStyle) = rememberPreference(
+        com.krish.jaatplayer.constants.SearchDockPuckStyleKey,
+        defaultValue = true
+    )
+
     val glassConfig = LocalGlassEffectConfig.current
     val useGlass = glassConfig.isEnabledFor(GlassComponent.NAV_BAR) && isGlassSupported()
     val dockShape = RoundedCornerShape(percent = 50)
@@ -720,6 +742,18 @@ private fun SearchGlassDock(
         onDispose {
             sensorManager.unregisterListener(listener)
         }
+    }
+
+    if (searchDockPuckStyle) {
+        // Water-drop puck style (same puck as the home navigation bar).
+        SearchPuckDock(
+            selectedTabIndex = selectedTabIndex,
+            onTabSelected = onTabSelected,
+            tabs = tabs,
+            pureBlack = pureBlack,
+            modifier = modifier
+        )
+        return
     }
 
     Box(

@@ -174,6 +174,10 @@ highlightKey: String? = null) {
         com.krish.jaatplayer.constants.SearchGyroPuckEnabledKey,
         defaultValue = false
     )
+    val (searchDockPuckStyle, onSearchDockPuckStyleChange) = rememberPreference(
+        com.krish.jaatplayer.constants.SearchDockPuckStyleKey,
+        defaultValue = true
+    )
     val (selectedThemeColorInt) = rememberPreference(
         SelectedThemeColorKey,
         defaultValue = DefaultThemeColor.toArgb()
@@ -1994,6 +1998,28 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { onEnableHapticsChange(!enableHaptics) }
+                ),
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == "Search Dock Drop Puck"),
+                    icon = painterResource(R.drawable.speed),
+                    title = { Text("Search Dock Drop Puck") },
+                    description = { Text("Water-drop glass puck on the Search page dock. Turn off for the Material pill") },
+                    trailingContent = {
+                        Switch(
+                            checked = searchDockPuckStyle,
+                            onCheckedChange = onSearchDockPuckStyleChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (searchDockPuckStyle) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onSearchDockPuckStyleChange(!searchDockPuckStyle) }
                 ),
                 Material3SettingsItem(
                     isHighlighted = (highlightKey == "Search Dock Gyro Motion"),

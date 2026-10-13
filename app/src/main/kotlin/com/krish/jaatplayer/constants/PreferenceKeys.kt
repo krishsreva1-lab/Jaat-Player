@@ -30,6 +30,8 @@ val EnableLegacyIconKey = booleanPreferencesKey("enableLegacyIcon")
 val EnableHighRefreshRateKey = booleanPreferencesKey("enableHighRefreshRate")
 val EnableHapticsKey = booleanPreferencesKey("enableHaptics")
 val SearchGyroPuckEnabledKey = booleanPreferencesKey("searchGyroPuckEnabled")
+// Search page dock style: true = water-drop glass puck (default), false = Material pill.
+val SearchDockPuckStyleKey = booleanPreferencesKey("searchDockPuckStyle")
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
 val SelectedThemeColorKey = intPreferencesKey("selectedThemeColor")
 val DarkModeKey = stringPreferencesKey("darkMode")

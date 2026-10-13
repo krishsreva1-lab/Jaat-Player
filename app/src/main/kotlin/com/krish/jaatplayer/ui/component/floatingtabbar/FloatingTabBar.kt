@@ -821,11 +821,9 @@ private fun SharedTransitionScope.ExpandedBar(
                 colors = colors,
                 elevations = elevations,
                 animatedVisibilityScope = animatedVisibilityScope,
-                modifier = if (tabRowWidthPx > 0) {
-                    Modifier.width(with(density) { tabRowWidthPx.toDp() })
-                } else {
-                    Modifier.fillMaxWidth()
-                }
+                // Full width, as in the original design: the mini player must not shrink
+                // to the (narrower) tab pill. Capped by MiniPlayer's own widthIn(max).
+                modifier = Modifier.fillMaxWidth()
             )
         }
 
