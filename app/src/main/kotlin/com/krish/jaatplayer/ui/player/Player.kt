@@ -42,6 +42,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -1728,14 +1729,10 @@ fun BottomSheetPlayer(
                     ) {
                         AnimatedContent(targetState = showInlineLyrics, label = "DownloadButton") { showLyrics ->
                             if (showLyrics) {
-                                FilledIconButton(
+                                LiquidGlassPuckButton(
                                     onClick = { isFullScreen = !isFullScreen },
-                                    shape = shareShape,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = textButtonColor,
-                                        contentColor = iconButtonColor,
-                                    ),
-                                    modifier = Modifier.size(42.dp),
+                                    buttonColor = textButtonColor,
+                                    contentColor = iconButtonColor,
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.fullscreen),
@@ -1744,7 +1741,7 @@ fun BottomSheetPlayer(
                                     )
                                 }
                             } else {
-                                FilledIconButton(
+                                LiquidGlassPuckButton(
                                     onClick = {
                                         mediaMetadata?.let { meta ->
                                             when (download?.state) {
@@ -1776,12 +1773,8 @@ fun BottomSheetPlayer(
                                             }
                                         }
                                     },
-                                    shape = shareShape,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = textButtonColor,
-                                        contentColor = iconButtonColor,
-                                    ),
-                                    modifier = Modifier.size(42.dp),
+                                    buttonColor = textButtonColor,
+                                    contentColor = iconButtonColor,
                                 ) {
                                     when (download?.state) {
                                         Download.STATE_COMPLETED -> {
@@ -1811,7 +1804,7 @@ fun BottomSheetPlayer(
                         AnimatedContent(targetState = showInlineLyrics, label = "LikeButton") { showLyrics ->
                             if (showLyrics) {
                                 val currentLyrics by playerConnection.currentLyrics.collectAsState(initial = null)
-                                FilledIconButton(
+                                LiquidGlassPuckButton(
                                     onClick = {
                                         menuState.show {
                                             com.krish.jaatplayer.ui.menu.LyricsMenu(
@@ -1829,12 +1822,8 @@ fun BottomSheetPlayer(
                                             )
                                         }
                                     },
-                                    shape = favShape,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = textButtonColor,
-                                        contentColor = iconButtonColor,
-                                    ),
-                                    modifier = Modifier.size(42.dp),
+                                    buttonColor = textButtonColor,
+                                    contentColor = iconButtonColor,
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.more_horiz),
@@ -1843,14 +1832,10 @@ fun BottomSheetPlayer(
                                     )
                                 }
                             } else {
-                                FilledIconButton(
+                                LiquidGlassPuckButton(
                                     onClick = playerConnection::toggleLike,
-                                    shape = favShape,
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = textButtonColor,
-                                        contentColor = iconButtonColor,
-                                    ),
-                                    modifier = Modifier.size(42.dp),
+                                    buttonColor = textButtonColor,
+                                    contentColor = if (currentSong?.song?.liked == true) MaterialTheme.colorScheme.error else iconButtonColor,
                                 ) {
                                     Icon(
                                         painter = painterResource(
@@ -1868,20 +1853,15 @@ fun BottomSheetPlayer(
                 } else {
                     AnimatedContent(targetState = showInlineLyrics, label = "DownloadButton") { showLyrics ->
                         if (showLyrics) {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(textButtonColor.copy(alpha = 0.2f))
-                                    .clickable { isFullScreen = !isFullScreen },
+                            LiquidGlassPuckButton(
+                                onClick = { isFullScreen = !isFullScreen },
+                                buttonColor = textButtonColor,
+                                contentColor = iconButtonColor,
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.fullscreen),
                                     contentDescription = null,
-                                    tint = textButtonColor,
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(24.dp),
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         } else {
@@ -1909,22 +1889,17 @@ fun BottomSheetPlayer(
                                 }
                             }
 
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(textButtonColor.copy(alpha = 0.2f))
-                                    .clickable {
-                                        if (usePlayerDock) showPlayerDock = true else openOldPlayerMenu()
-                                    },
+                            LiquidGlassPuckButton(
+                                onClick = {
+                                    if (usePlayerDock) showPlayerDock = true else openOldPlayerMenu()
+                                },
+                                buttonColor = textButtonColor,
+                                contentColor = iconButtonColor,
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.more_vert),
                                     contentDescription = null,
-                                    tint = textButtonColor,
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(24.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
 
@@ -1946,45 +1921,38 @@ fun BottomSheetPlayer(
                     AnimatedContent(targetState = showInlineLyrics, label = "LikeButton") { showLyrics ->
                         if (showLyrics) {
                             val currentLyrics by playerConnection.currentLyrics.collectAsState(initial = null)
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(textButtonColor.copy(alpha = 0.2f))
-                                    .clickable {
-                                        menuState.show {
-                                            com.krish.jaatplayer.ui.menu.LyricsMenu(
-                                                lyricsProvider = { currentLyrics },
-                                                songProvider = { currentSong?.song },
-                                                mediaMetadataProvider = { mediaMetadata },
-                                                onDismiss = menuState::dismiss,
-                                                onShowOffsetDialog = {
-                                                    bottomSheetPageState.show {
-                                                        ShowOffsetDialog(
-                                                            songProvider = { currentSong?.song }
-                                                        )
-                                                    }
+                            LiquidGlassPuckButton(
+                                onClick = {
+                                    menuState.show {
+                                        com.krish.jaatplayer.ui.menu.LyricsMenu(
+                                            lyricsProvider = { currentLyrics },
+                                            songProvider = { currentSong?.song },
+                                            mediaMetadataProvider = { mediaMetadata },
+                                            onDismiss = menuState::dismiss,
+                                            onShowOffsetDialog = {
+                                                bottomSheetPageState.show {
+                                                    ShowOffsetDialog(
+                                                        songProvider = { currentSong?.song }
+                                                    )
                                                 }
-                                            )
-                                        }
-                                    },
+                                            }
+                                        )
+                                    }
+                                },
+                                buttonColor = textButtonColor,
+                                contentColor = iconButtonColor,
                             ) {
                                 Icon(
                                     painter = painterResource(R.drawable.more_horiz),
                                     contentDescription = null,
-                                    tint = textButtonColor,
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(24.dp),
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         } else {
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(textButtonColor.copy(alpha = 0.2f))
-                                    .clickable(onClick = playerConnection::toggleLike),
+                            LiquidGlassPuckButton(
+                                onClick = playerConnection::toggleLike,
+                                buttonColor = textButtonColor,
+                                contentColor = if (currentSong?.song?.liked == true) MaterialTheme.colorScheme.error else iconButtonColor,
                             ) {
                                 Icon(
                                     painter = painterResource(
@@ -1993,10 +1961,7 @@ fun BottomSheetPlayer(
                                         else R.drawable.favorite_border
                                     ),
                                     contentDescription = null,
-                                    tint = textButtonColor,
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .size(24.dp),
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
@@ -3535,4 +3500,45 @@ private fun BackgroundVideoView(
         },
         modifier = modifier.alpha(alpha)
     )
+}
+
+@Composable
+private fun LiquidGlassPuckButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    buttonColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val puckShape = RoundedCornerShape(percent = 50)
+    val glassConfig = com.krish.jaatplayer.ui.component.LocalGlassEffectConfig.current
+    val useGlass = glassConfig.globalEnabled && com.krish.jaatplayer.ui.component.isGlassSupported()
+
+    val glassModifier = if (useGlass) {
+        Modifier
+            .clip(puckShape)
+            .liquidGlass(config = glassConfig, shape = puckShape)
+            .background(buttonColor.copy(alpha = 0.22f))
+            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)), shape = puckShape)
+    } else {
+        Modifier
+            .clip(puckShape)
+            .background(buttonColor.copy(alpha = 0.25f))
+            .border(BorderStroke(1.dp, buttonColor.copy(alpha = 0.3f)), shape = puckShape)
+    }
+
+    Box(
+        modifier = modifier
+            .size(44.dp)
+            .then(glassModifier)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides contentColor) {
+            Box {
+                content()
+            }
+        }
+    }
 }

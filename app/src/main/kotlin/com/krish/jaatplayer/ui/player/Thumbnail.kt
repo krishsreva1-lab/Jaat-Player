@@ -580,13 +580,16 @@ private fun ThumbnailItem(
     modifier: Modifier = Modifier,
 ) {
     val rotatingThumbnail by rememberPreference(RotatingThumbnailKey, defaultValue = false)
+    // Vinyl record artwork (opt-in). Wins over the clover shape when both are on.
+    val vinylThumbnail by rememberPreference(com.krish.jaatplayer.constants.VinylThumbnailKey, defaultValue = false)
+    val spinningThumbnail = rotatingThumbnail || vinylThumbnail
     val isPlaying by playerConnection.isPlaying.collectAsState()
     val isCurrentItem = item.mediaId == currentMediaId
     
     val infiniteTransition = rememberInfiniteTransition(label = "ThumbnailRotation")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = if (isPlaying && rotatingThumbnail && isCurrentItem) 360f else 0f,
+        targetValue = if (isPlaying && spinningThumbnail && isCurrentItem) 360f else 0f,
         animationSpec = infiniteRepeatable(
             animation = tween(20000, easing = LinearEasing),
             repeatMode = androidx.compose.animation.core.RepeatMode.Restart
@@ -679,14 +682,17 @@ private fun ThumbnailItem(
                     rotationZ = rotation
                 }
                 .clip(
-                    if (rotatingThumbnail) {
+                    if (vinylThumbnail) {
+                        androidx.compose.foundation.shape.CircleShape
+                    } else if (rotatingThumbnail) {
                         MaterialShapes.Clover8Leaf.toShape()
                     } else {
                         RoundedCornerShape(dimensions.cornerRadius)
                     }
                 )
                 .graphicsLayer {
-                    rotationZ = -rotation
+                    // A vinyl spins together with its label; only the clover counter-rotates.
+                    rotationZ = if (vinylThumbnail) 0f else -rotation
                 }
         ) {
             if (hidePlayerThumbnail) {
@@ -703,8 +709,32 @@ private fun ThumbnailItem(
                     cropArtwork = cropAlbumArt
                 )
             }
-            
-            if (canvasThumbnailAnimation && item.mediaId == currentMediaId && !rotatingThumbnail && playerBackground != PlayerBackgroundStyle.APPLE_MUSIC) {
+
+            if (vinylThumbnail && !hidePlayerThumbnail) {
+                androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                    val r = size.minDimension / 2f
+                    val c = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                    // Black record body drawn as a ring, so the artwork stays visible in the
+                    // middle as the vinyl's paper label.
+                    drawCircle(
+                        color = Color.Black.copy(alpha = 0.82f),
+                        radius = r * 0.67f,
+                        center = c,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = r * 0.66f),
+                    )
+                    for (i in 1..7) {
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.05f),
+                            radius = r * (0.40f + i * 0.083f),
+                            center = c,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx()),
+                        )
+                    }
+                    drawCircle(Color.Black, radius = r * 0.055f, center = c)
+                }
+            }
+
+            if (canvasThumbnailAnimation && item.mediaId == currentMediaId && !spinningThumbnail && playerBackground != PlayerBackgroundStyle.APPLE_MUSIC) {
                 var canvasArtwork by remember(item.mediaId) { mutableStateOf<CanvasArtwork?>(null) }
                 var canvasFetchInFlight by remember(item.mediaId) { mutableStateOf(false) }
                 val storefront = remember {

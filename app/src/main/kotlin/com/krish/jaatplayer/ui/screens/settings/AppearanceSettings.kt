@@ -320,6 +320,10 @@ highlightKey: String? = null) {
         RotatingThumbnailKey,
         defaultValue = false
     )
+    val (vinylThumbnail, onVinylThumbnailChange) = rememberPreference(
+        com.krish.jaatplayer.constants.VinylThumbnailKey,
+        defaultValue = false
+    )
     val (gridItemSize, onGridItemSizeChange) = rememberEnumPreference(
         GridItemsSizeKey,
         defaultValue = GridItemSize.SMALL
@@ -1497,6 +1501,28 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { onRotatingThumbnailChange(!rotatingThumbnail) }
+                ),
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == "Vinyl Artwork"),
+                    icon = painterResource(R.drawable.image),
+                    title = { Text("Vinyl record artwork") },
+                    description = { Text("Show the player artwork as a spinning vinyl record. Takes priority over the rotating clover shape") },
+                    trailingContent = {
+                        Switch(
+                            checked = vinylThumbnail,
+                            onCheckedChange = onVinylThumbnailChange,
+                            thumbContent = {
+                                Icon(
+                                    painter = painterResource(
+                                        id = if (vinylThumbnail) R.drawable.check else R.drawable.close
+                                    ),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SwitchDefaults.IconSize)
+                                )
+                            }
+                        )
+                    },
+                    onClick = { onVinylThumbnailChange(!vinylThumbnail) }
                 ),
                 Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.show_comment_button)),
