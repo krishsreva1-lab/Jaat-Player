@@ -506,6 +506,8 @@ highlightKey: String? = null) {
                         }
                     },
                     showBadge = true,
+                    enabled = !isLosslessSelected,
+                    disabledMessage = "Crossfade is not available while using Lossless audio. Change Audio quality first",
                     trailingContent = {
                         Switch(
                             checked = if (isLosslessSelected) false else crossfadeEnabled,
@@ -540,8 +542,10 @@ highlightKey: String? = null) {
                         }
                     }
                 ))
-                if (crossfadeEnabled && !isLosslessSelected) {
+                run {
                     add(Material3SettingsItem(
+                    enabled = crossfadeEnabled && !isLosslessSelected,
+                    disabledMessage = if (isLosslessSelected) "Crossfade is not available while using Lossless audio" else "Turn on Crossfade first",
     isHighlighted = (highlightKey == stringResource(R.string.crossfade_duration)),
                         icon = painterResource(R.drawable.timer),
                         title = { Text(stringResource(R.string.crossfade_duration)) },
@@ -558,6 +562,8 @@ highlightKey: String? = null) {
                         }
                     ))
                     add(Material3SettingsItem(
+                    enabled = crossfadeEnabled && !isLosslessSelected,
+                    disabledMessage = if (isLosslessSelected) "Crossfade is not available while using Lossless audio" else "Turn on Crossfade first",
     isHighlighted = (highlightKey == stringResource(R.string.crossfade_gapless)),
                         icon = painterResource(R.drawable.album),
                         title = { Text(stringResource(R.string.crossfade_gapless)) },
@@ -580,6 +586,8 @@ highlightKey: String? = null) {
                         onClick = { onCrossfadeGaplessChange(!crossfadeGapless) }
                     ))
                     add(Material3SettingsItem(
+                    enabled = crossfadeEnabled && !isLosslessSelected,
+                    disabledMessage = if (isLosslessSelected) "Crossfade is not available while using Lossless audio" else "Turn on Crossfade first",
                         isHighlighted = highlightKey == stringResource(R.string.automix),
                         icon = painterResource(R.drawable.graphic_eq),
                         title = { Text(stringResource(R.string.automix)) },
@@ -603,6 +611,8 @@ highlightKey: String? = null) {
                     ))
                     if (automixCrossfade) {
                         add(Material3SettingsItem(
+                    enabled = crossfadeEnabled && !isLosslessSelected,
+                    disabledMessage = if (isLosslessSelected) "Crossfade is not available while using Lossless audio" else "Turn on Crossfade first",
                             isHighlighted = highlightKey == "Creative Transitions",
                             icon = painterResource(R.drawable.graphic_eq),
                             title = { Text("Creative transitions") },
@@ -625,6 +635,8 @@ highlightKey: String? = null) {
                             onClick = { onCreativeTransitionsChange(!creativeTransitions) }
                         ))
                         add(Material3SettingsItem(
+                    enabled = crossfadeEnabled && !isLosslessSelected,
+                    disabledMessage = if (isLosslessSelected) "Crossfade is not available while using Lossless audio" else "Turn on Crossfade first",
                             isHighlighted = highlightKey == stringResource(R.string.automix_debug),
                             icon = painterResource(R.drawable.bug_report),
                             title = { Text(stringResource(R.string.automix_debug)) },
@@ -649,6 +661,8 @@ highlightKey: String? = null) {
                     }
 
                     add(Material3SettingsItem(
+                    enabled = crossfadeEnabled && !isLosslessSelected,
+                    disabledMessage = if (isLosslessSelected) "Crossfade is not available while using Lossless audio" else "Turn on Crossfade first",
                         icon = painterResource(R.drawable.bug_report),
                         title = { Text("Jaat Spatial Debug Overlay") },
                         description = { Text("Show live Jaat Spatial DSP metrics & status on player") },
@@ -697,10 +711,14 @@ highlightKey: String? = null) {
                             }
                         )
                     },
+                    enabled = !isLosslessSelected,
+                    disabledMessage = "Manual crossfade is not available while using Lossless audio. Change Audio quality first",
                     onClick = { if (!isLosslessSelected) onManualCrossfadeEnabledChange(!manualCrossfadeEnabled) }
                 ))
-                if (manualCrossfadeEnabled && !isLosslessSelected) {
+                run {
                     add(Material3SettingsItem(
+                    enabled = manualCrossfadeEnabled && !isLosslessSelected,
+                    disabledMessage = if (isLosslessSelected) "Not available while using Lossless audio" else "Turn on Manual crossfade first",
                         isHighlighted = (highlightKey == "Manual Crossfade Duration"),
                         icon = painterResource(R.drawable.timer),
                         title = { Text("Manual crossfade duration") },
@@ -776,6 +794,8 @@ highlightKey: String? = null) {
                             }
                         )
                     },
+                    enabled = skipSilence,
+                    disabledMessage = "Turn on Skip silence first",
                     onClick = { if (skipSilence) onSkipSilenceInstantChange(!skipSilenceInstant) }
                 ))
                 add(Material3SettingsItem(
@@ -825,6 +845,8 @@ highlightKey: String? = null) {
                             }
                         )
                     },
+                    enabled = !crossfadeEnabled,
+                    disabledMessage = "Audio offload can't be used together with Crossfade. Turn off Crossfade first",
                     onClick = { if (!crossfadeEnabled) onAudioOffloadChange(!audioOffload) }
                 ))
                 
@@ -852,8 +874,10 @@ highlightKey: String? = null) {
                     onClick = { onPreloadNextSongEnabledChange(!preloadNextSongEnabled) }
                 ))
 
-                if (preloadNextSongEnabled) {
+                run {
                     add(Material3SettingsItem(
+                    enabled = preloadNextSongEnabled,
+                    disabledMessage = "Turn on Preload Next Song first",
     isHighlighted = (highlightKey == "Preload Limit"),
                         icon = painterResource(R.drawable.library_music),
                         title = { Text("Preload Limit") },
@@ -871,6 +895,8 @@ highlightKey: String? = null) {
                     ))
                     
                     add(Material3SettingsItem(
+                    enabled = preloadNextSongEnabled,
+                    disabledMessage = "Turn on Preload Next Song first",
     isHighlighted = (highlightKey == "Preload Lyrics"),
                         icon = painterResource(R.drawable.queue_music),
                         title = { Text("Preload Lyrics") },

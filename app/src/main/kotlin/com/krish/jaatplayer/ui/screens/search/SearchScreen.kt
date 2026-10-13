@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -278,13 +279,37 @@ fun SearchScreen(
         drawContent()
     }
 
+    val searchGlassConfig = LocalGlassEffectConfig.current
+    // Liquid glass search field: follows the nav bar glass setting, and only while the field is
+    // collapsed (the expanded search lives in its own window, which can't sample the backdrop).
+    val searchFieldGlass = searchGlassConfig.isEnabledFor(GlassComponent.NAV_BAR) &&
+        isGlassSupported() && !searchActive
+    val searchBarShape = RoundedCornerShape(percent = 50)
+    val topBarBackground = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface
+
     Scaffold(
         topBar = {
             Column(
                 modifier = Modifier
-                    .background(if (pureBlack) Color.Black else MaterialTheme.colorScheme.surface)
-                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .then(
+                        if (searchFieldGlass) {
+                            // Transparent so the tab content scrolls UNDER the glass field and dock.
+                            Modifier
+                        } else {
+                            Modifier
+                                .background(topBarBackground)
+                                .windowInsetsPadding(WindowInsets.statusBars)
+                        }
+                    )
             ) {
+                if (searchFieldGlass) {
+                    Spacer(
+                        Modifier
+                            .fillMaxWidth()
+                            .windowInsetsTopHeight(WindowInsets.statusBars)
+                            .background(topBarBackground)
+                    )
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -310,135 +335,148 @@ fun SearchScreen(
                         }
                     }
 
-                    SearchBar(
-                        inputField = {
-                            BasicTextField(
-                                value = query,
-                                onValueChange = { query = it },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp)
-                                    .focusRequester(focusRequester),
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(onSearch = { 
-                                    onSearch(query.text)
-                                    searchActive = false
-                                }),
-                                textStyle = TextStyle(
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 16.sp
-                                ),
-                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                decorationBox = { innerTextField ->
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 16.dp)
-                                    ) {
-                                        IconButton(
-                                            onClick = {
-                                                if (searchActive) {
-                                                    searchActive = false
-                                                    query = TextFieldValue("") 
-                                                } else {
-                                                    searchActive = true 
+                    CompositionLocalProvider(LocalAppBackdrop provides searchBackdrop) {
+                        SearchBar(
+                            inputField = {
+                                BasicTextField(
+                                    value = query,
+                                    onValueChange = { query = it },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp)
+                                        .focusRequester(focusRequester),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                    keyboardActions = KeyboardActions(onSearch = { 
+                                        onSearch(query.text)
+                                        searchActive = false
+                                    }),
+                                    textStyle = TextStyle(
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 16.sp
+                                    ),
+                                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                    decorationBox = { innerTextField ->
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 16.dp)
+                                        ) {
+                                            IconButton(
+                                                onClick = {
+                                                    if (searchActive) {
+                                                        searchActive = false
+                                                        query = TextFieldValue("") 
+                                                    } else {
+                                                        searchActive = true 
+                                                    }
                                                 }
-                                            }
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(if (searchActive) R.drawable.arrow_back else R.drawable.search),
-                                                contentDescription = if (searchActive) stringResource(R.string.dismiss) else null,
-                                                tint = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .padding(horizontal = 4.dp)
-                                        ) {
-                                            if (query.text.isEmpty()) {
-                                                Text(
-                                                    text = stringResource(
-                                                        when (searchSource) {
-                                                            SearchSource.LOCAL -> R.string.search_library
-                                                            SearchSource.ONLINE -> R.string.search_yt_music
-                                                        }
-                                                    ),
-                                                    style = TextStyle(
-                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                                        fontSize = 16.sp
-                                                    )
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(if (searchActive) R.drawable.arrow_back else R.drawable.search),
+                                                    contentDescription = if (searchActive) stringResource(R.string.dismiss) else null,
+                                                    tint = MaterialTheme.colorScheme.onSurface
                                                 )
                                             }
-                                            innerTextField()
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (query.text.isNotEmpty()) {
-                                                IconButton(onClick = { query = TextFieldValue("") }) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .padding(horizontal = 4.dp)
+                                            ) {
+                                                if (query.text.isEmpty()) {
+                                                    Text(
+                                                        text = stringResource(
+                                                            when (searchSource) {
+                                                                SearchSource.LOCAL -> R.string.search_library
+                                                                SearchSource.ONLINE -> R.string.search_yt_music
+                                                            }
+                                                        ),
+                                                        style = TextStyle(
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                                            fontSize = 16.sp
+                                                        )
+                                                    )
+                                                }
+                                                innerTextField()
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                if (query.text.isNotEmpty()) {
+                                                    IconButton(onClick = { query = TextFieldValue("") }) {
+                                                        Icon(
+                                                            painter = painterResource(R.drawable.close),
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    }
+                                                }
+                                                IconButton(
+                                                    onClick = {
+                                                        searchSource = if (searchSource == SearchSource.ONLINE) 
+                                                            SearchSource.LOCAL else SearchSource.ONLINE
+                                                    }
+                                                ) {
                                                     Icon(
-                                                        painter = painterResource(R.drawable.close),
+                                                        painter = painterResource(
+                                                            when (searchSource) {
+                                                                SearchSource.LOCAL -> R.drawable.library_music
+                                                                SearchSource.ONLINE -> R.drawable.globe_search
+                                                            }
+                                                        ),
                                                         contentDescription = null,
                                                         tint = MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
                                             }
-                                            IconButton(
-                                                onClick = {
-                                                    searchSource = if (searchSource == SearchSource.ONLINE) 
-                                                        SearchSource.LOCAL else SearchSource.ONLINE
-                                                }
-                                            ) {
-                                                Icon(
-                                                    painter = painterResource(
-                                                        when (searchSource) {
-                                                            SearchSource.LOCAL -> R.drawable.library_music
-                                                            SearchSource.ONLINE -> R.drawable.globe_search
-                                                        }
-                                                    ),
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            }
                                         }
                                     }
-                                }
-                            )
-                        },
-                        expanded = searchActive,
-                        onExpandedChange = { searchActive = it },
-                        windowInsets = WindowInsets(0, 0, 0, 0),
-                        colors = SearchBarDefaults.colors(
-                            containerColor = if (pureBlack) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(
-                                start = if (searchActive) 0.dp else 4.dp,
-                                end = if (searchActive) 0.dp else 12.dp
-                            )
-                    ) {
-                    if (showSearchContent) {
-                        when (searchSource) {
-                            SearchSource.LOCAL -> LocalSearchScreen(
-                                query = query.text,
-                                navController = navController,
-                                onDismiss = { searchActive = false },
-                                pureBlack = pureBlack
-                            )
-                            SearchSource.ONLINE -> OnlineSearchScreen(
-                                query = query.text,
-                                onQueryChange = { query = it },
-                                navController = navController,
-                                onSearch = {
-                                    onSearchFromSuggestion(it)
-                                    searchActive = false
-                                },
-                                onDismiss = { searchActive = false },
-                                pureBlack = pureBlack
-                            )
+                                )
+                            },
+                            expanded = searchActive,
+                            onExpandedChange = { searchActive = it },
+                            windowInsets = WindowInsets(0, 0, 0, 0),
+                            colors = SearchBarDefaults.colors(
+                                containerColor = if (searchFieldGlass) Color.Transparent
+                                    else if (pureBlack) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                            shape = searchBarShape,
+                            tonalElevation = if (searchFieldGlass) 0.dp else SearchBarDefaults.TonalElevation,
+                            shadowElevation = if (searchFieldGlass) 0.dp else SearchBarDefaults.ShadowElevation,
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(
+                                    if (searchFieldGlass) {
+                                        Modifier.liquidGlass(config = searchGlassConfig, shape = searchBarShape)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                                .padding(
+                                    start = if (searchActive) 0.dp else 4.dp,
+                                    end = if (searchActive) 0.dp else 12.dp
+                                )
+                        ) {
+                        if (showSearchContent) {
+                            when (searchSource) {
+                                SearchSource.LOCAL -> LocalSearchScreen(
+                                    query = query.text,
+                                    navController = navController,
+                                    onDismiss = { searchActive = false },
+                                    pureBlack = pureBlack
+                                )
+                                SearchSource.ONLINE -> OnlineSearchScreen(
+                                    query = query.text,
+                                    onQueryChange = { query = it },
+                                    navController = navController,
+                                    onSearch = {
+                                        onSearchFromSuggestion(it)
+                                        searchActive = false
+                                    },
+                                    onDismiss = { searchActive = false },
+                                    pureBlack = pureBlack
+                                )
+                            }
                         }
                     }
-                }
+                    }
 
                 }
 
@@ -466,12 +504,15 @@ fun SearchScreen(
         
         Box(
             modifier = Modifier
-                .padding(top = paddingValues.calculateTopPadding())
+                .padding(top = if (searchFieldGlass) 0.dp else paddingValues.calculateTopPadding())
                 .fillMaxSize()
                 .layerBackdrop(searchBackdrop)
         ) {
             if (!searchActive) {
-                val tabPadding = PaddingValues(bottom = bottomPadding)
+                val tabPadding = PaddingValues(
+                    top = if (searchFieldGlass) paddingValues.calculateTopPadding() else 0.dp,
+                    bottom = bottomPadding
+                )
                 when (selectedTabIndex) {
                     0 -> ExploreTabContent(navController = navController, contentPadding = tabPadding)
                     1 -> SuggestionsTabContent(navController = navController, contentPadding = tabPadding)
@@ -615,7 +656,7 @@ fun AlbumsTabContent(
             columns = GridCells.Adaptive(minSize = GridThumbnailHeight + if (gridItemSize == GridItemSize.BIG) 24.dp else (-24).dp),
             contentPadding = PaddingValues(
                 start = 12.dp,
-                top = 12.dp,
+                top = 12.dp + contentPadding.calculateTopPadding(),
                 end = 12.dp,
                 bottom = 12.dp + contentPadding.calculateBottomPadding()
             ),

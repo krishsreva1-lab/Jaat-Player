@@ -8,6 +8,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import android.widget.Toast
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -99,12 +105,18 @@ private fun Material3SettingsItemRow(
     compact: Boolean = false,
     scrollState: ScrollState? = null
 ) {
+    // A greyed-out row that knows WHY it is greyed out: tapping it (or its switch) shows
+    // the reason instead of doing nothing. See Material3SettingsItem.disabledMessage.
+    val context = LocalContext.current
+    val showDisabledMessage: () -> Unit = {
+        item.disabledMessage?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
-                enabled = item.enabled && item.onClick != null,
-                onClick = { item.onClick?.invoke() }
+                enabled = item.enabled && item.onClick != null || !item.enabled && item.disabledMessage != null,
+                onClick = { if (item.enabled) item.onClick?.invoke() else showDisabledMessage() }
             )
             .then(if (scrollState != null) Modifier.scrollToOnHighlight(scrollState, item.isHighlighted) else Modifier)
             .padding(
@@ -232,7 +244,23 @@ private fun Material3SettingsItemRow(
                             MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 ) {
-                    desc()
+                    if (item.enabled) {
+                        desc()
+                    } else {
+                        // Descriptions can hold sliders etc.: dim them and make them inert.
+                        Box {
+                            Box(Modifier.alpha(0.6f)) { desc() }
+                            Box(
+                                Modifier
+                                    .matchParentSize()
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = showDisabledMessage
+                                    )
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -240,7 +268,24 @@ private fun Material3SettingsItemRow(
         
         item.trailingContent?.let { trailing ->
             Spacer(modifier = Modifier.width(8.dp))
-            trailing()
+            if (item.enabled) {
+                trailing()
+            } else {
+                // Dimmed, and covered by a transparent layer so the switch / slider / radio
+                // inside cannot be operated; tapping it explains why instead.
+                Box {
+                    Box(Modifier.alpha(0.38f)) { trailing() }
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = showDisabledMessage
+                            )
+                    )
+                }
+            }
         }
     }
 }
@@ -257,5 +302,7 @@ data class Material3SettingsItem(
     val tintIcon: Boolean = true,
     val iconShape: Shape? = null,
     val enabled: Boolean = true,
-    val onClick: (() -> Unit)? = null
+    val onClick: (() -> Unit)? = null,
+    /** Shown as a toast when the user taps this item while [enabled] is false. */
+    val disabledMessage: String? = null
 )

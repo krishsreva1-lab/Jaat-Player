@@ -52,51 +52,65 @@ fun PreferenceEntry(
     trailingContent: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     isEnabled: Boolean = true,
+    disabledClickReason: String? = null,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-        modifier
-            .fillMaxWidth()
-            .clickable(
-                enabled = isEnabled && onClick != null,
-                onClick = onClick ?: {},
-            ).alpha(if (isEnabled) 1f else 0.5f)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-    ) {
-        if (icon != null) {
-            Box(
-                modifier = Modifier.padding(horizontal = 4.dp),
-            ) {
-                icon()
-            }
-
-            Spacer(Modifier.width(12.dp))
-        }
-
-        Column(
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.weight(1f),
-        ) {
-            ProvideTextStyle(MaterialTheme.typography.titleMedium) {
-                title()
-            }
-
-            if (description != null) {
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.secondary,
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Box(modifier = modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (!isEnabled) Modifier.alpha(0.38f) else Modifier)
+                .clickable(
+                    enabled = isEnabled && onClick != null,
+                    onClick = onClick ?: {},
                 )
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+        ) {
+            if (icon != null) {
+                Box(
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                ) {
+                    icon()
+                }
+
+                Spacer(Modifier.width(12.dp))
             }
 
-            content?.invoke()
+            Column(
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.weight(1f),
+            ) {
+                ProvideTextStyle(MaterialTheme.typography.titleMedium) {
+                    title()
+                }
+
+                if (description != null) {
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+
+                content?.invoke()
+            }
+
+            if (trailingContent != null) {
+                Spacer(Modifier.width(12.dp))
+
+                trailingContent()
+            }
         }
 
-        if (trailingContent != null) {
-            Spacer(Modifier.width(12.dp))
-
-            trailingContent()
+        if (!isEnabled && disabledClickReason != null) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable {
+                        android.widget.Toast.makeText(context, disabledClickReason, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+            )
         }
     }
 }
@@ -111,6 +125,7 @@ fun <T> ListPreference(
     valueText: @Composable (T) -> String,
     onValueSelected: (T) -> Unit,
     isEnabled: Boolean = true,
+    disabledClickReason: String? = null,
 ) {
     var showDialog by remember {
         mutableStateOf(false)
@@ -152,6 +167,7 @@ fun <T> ListPreference(
         icon = icon,
         onClick = { showDialog = true },
         isEnabled = isEnabled,
+        disabledClickReason = disabledClickReason,
     )
 }
 
@@ -164,6 +180,7 @@ inline fun <reified T : Enum<T>> EnumListPreference(
     noinline valueText: @Composable (T) -> String,
     noinline onValueSelected: (T) -> Unit,
     isEnabled: Boolean = true,
+    disabledClickReason: String? = null,
 ) {
     ListPreference(
         modifier = modifier,
@@ -174,6 +191,7 @@ inline fun <reified T : Enum<T>> EnumListPreference(
         valueText = valueText,
         onValueSelected = onValueSelected,
         isEnabled = isEnabled,
+        disabledClickReason = disabledClickReason,
     )
 }
 
@@ -186,6 +204,7 @@ fun SwitchPreference(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     isEnabled: Boolean = true,
+    disabledClickReason: String? = null,
 ) {
     PreferenceEntry(
         modifier = modifier,
@@ -209,7 +228,8 @@ fun SwitchPreference(
             )
         },
         onClick = { onCheckedChange(!checked) },
-        isEnabled = isEnabled
+        isEnabled = isEnabled,
+        disabledClickReason = disabledClickReason,
     )
 }
 

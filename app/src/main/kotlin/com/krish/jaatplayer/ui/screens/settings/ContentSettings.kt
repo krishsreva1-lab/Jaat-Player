@@ -959,9 +959,11 @@ highlightKey: String? = null) {
                         onClick = { onProxyEnabledChange(!proxyEnabled) }
                     )
                 )
-                if (proxyEnabled) {
+                run {
                     add(
                         Material3SettingsItem(
+                            enabled = proxyEnabled,
+                            disabledMessage = "Turn on Proxy first",
     isHighlighted = (highlightKey == stringResource(R.string.config_proxy)),
                             icon = painterResource(R.drawable.settings),
                             title = { Text(stringResource(R.string.config_proxy)) },

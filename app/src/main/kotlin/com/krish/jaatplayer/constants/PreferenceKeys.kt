@@ -540,6 +540,17 @@ val SearchSourceKey = stringPreferencesKey("searchSource")
 val SwipeThumbnailKey = booleanPreferencesKey("swipeThumbnail")
 val RotatingThumbnailKey = booleanPreferencesKey("rotatingThumbnail")
 val VinylThumbnailKey = booleanPreferencesKey("vinylThumbnail")
+
+// Custom Home background (image / GIF / video behind the Home screen). Off by default.
+val HomeBackgroundEnabledKey = booleanPreferencesKey("homeBackgroundEnabled")
+val HomeBackgroundPathKey = stringPreferencesKey("homeBackgroundPath")
+val HomeBackgroundBlurKey = floatPreferencesKey("homeBackgroundBlur")
+val HomeBackgroundDimKey = floatPreferencesKey("homeBackgroundDim")
+val HomeBackgroundAnimateKey = booleanPreferencesKey("homeBackgroundAnimate")
+/** 0.3..1 scale of the device's screen resolution used when storing a picked image. */
+val HomeBackgroundQualityKey = floatPreferencesKey("homeBackgroundQuality")
+/** True when [HomeBackgroundPathKey] points at a video file instead of an image. */
+val HomeBackgroundIsVideoKey = booleanPreferencesKey("homeBackgroundIsVideo")
 val CanvasThumbnailAnimationKey = booleanPreferencesKey("canvasThumbnailAnimation")
 val SwipeSensitivityKey = floatPreferencesKey("swipeSensitivity")
 

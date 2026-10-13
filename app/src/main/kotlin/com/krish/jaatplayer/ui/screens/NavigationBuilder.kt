@@ -364,6 +364,10 @@ fun NavGraphBuilder.navigationBuilder(
         ThemeScreen(navController)
     }
 
+    composable("settings/appearance/home_background") {
+        com.krish.jaatplayer.ui.screens.settings.HomeBackgroundSettings(navController)
+    }
+
     composable("settings/appearance/liquidglass") {
         GlassEffectSettings(navController, scrollBehavior)
     }

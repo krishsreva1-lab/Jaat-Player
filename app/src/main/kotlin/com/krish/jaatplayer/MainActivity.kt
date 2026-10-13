@@ -1128,13 +1128,15 @@ class MainActivity : ComponentActivity() {
                                             topAppBarScrollBehavior.state.resetHeightOffset()
                                         }
                                     } else {
-                                        navController.navigate(screen.route) {
-                                            popUpTo(navController.graph.startDestinationId) {
-                                                inclusive = false
-                                                saveState = false
+                                        if (!navController.popBackStack(screen.route, false)) {
+                                            navController.navigate(screen.route) {
+                                                popUpTo(navController.graph.startDestinationId) {
+                                                    inclusive = false
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
                                             }
-                                            launchSingleTop = true
-                                            restoreState = false
                                         }
                                     }
                                 }
@@ -1287,13 +1289,15 @@ class MainActivity : ComponentActivity() {
                                             topAppBarScrollBehavior.state.resetHeightOffset()
                                         }
                                     } else {
-                                        navController.navigate(screen.route) {
-                                            popUpTo(navController.graph.startDestinationId) {
-                                                inclusive = false
-                                                saveState = false
+                                        if (!navController.popBackStack(screen.route, false)) {
+                                            navController.navigate(screen.route) {
+                                                popUpTo(navController.graph.startDestinationId) {
+                                                    inclusive = false
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
                                             }
-                                            launchSingleTop = true
-                                            restoreState = false
                                         }
                                     }
                                 }

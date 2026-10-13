@@ -344,6 +344,7 @@ fun LastFMSettingsScreen(
                         )
                     },
                     enabled = isLoggedIn,
+                    disabledMessage = "Log in to Last.fm first",
                     icon = painterResource(R.drawable.queue_music)
                 ),
                 Material3SettingsItem(
@@ -365,6 +366,7 @@ fun LastFMSettingsScreen(
                         )
                     },
                     enabled = isLoggedIn && lastfmScrobbling,
+                    disabledMessage = if (!isLoggedIn) "Log in to Last.fm first" else "Turn on scrobbling first",
                     icon = painterResource(R.drawable.play)
                 ),
                 Material3SettingsItem(
@@ -387,6 +389,7 @@ fun LastFMSettingsScreen(
                         )
                     },
                     enabled = isLoggedIn,
+                    disabledMessage = "Log in to Last.fm first",
                     icon = painterResource(R.drawable.thumb_up_like)
                 )
             )

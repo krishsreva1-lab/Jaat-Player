@@ -178,6 +178,10 @@ highlightKey: String? = null) {
         com.krish.jaatplayer.constants.SearchDockPuckStyleKey,
         defaultValue = true
     )
+    val (useFloatingNavBarForMiniPlayer) = rememberPreference(
+        com.krish.jaatplayer.constants.UseFloatingNavBarKey,
+        defaultValue = false
+    )
     val (selectedThemeColorInt) = rememberPreference(
         SelectedThemeColorKey,
         defaultValue = DefaultThemeColor.toArgb()
@@ -1097,6 +1101,15 @@ highlightKey: String? = null) {
                 )
                 add(
                     Material3SettingsItem(
+                        isHighlighted = (highlightKey == "Home Background"),
+                        icon = painterResource(R.drawable.image),
+                        title = { Text("Home background") },
+                        description = { Text("Use your own image or video behind the Home screen (off by default)") },
+                        onClick = { navController.navigate("settings/appearance/home_background") }
+                    )
+                )
+                add(
+                    Material3SettingsItem(
     isHighlighted = highlightKey == stringResource(R.string.fonts_title),
                         customIcon = { SettingsIcon(Icons.Rounded.TextFields) },
                         title = { Text(stringResource(R.string.fonts_title)) },
@@ -1130,9 +1143,11 @@ highlightKey: String? = null) {
                 )
                 
                 
-                if (!isUsingCustomColor) {
+                run {
                     add(
                         Material3SettingsItem(
+                            enabled = !isUsingCustomColor,
+                            disabledMessage = "A custom theme colour is selected. Reset the theme colour to the default first to use the dynamic theme",
     isHighlighted = (highlightKey == stringResource(R.string.enable_dynamic_theme)),
                             icon = painterResource(R.drawable.palette),
                             title = { Text(stringResource(R.string.enable_dynamic_theme)) },
@@ -1253,6 +1268,8 @@ highlightKey: String? = null) {
                                 }
                             )
                         },
+                        enabled = !useFloatingNavBarForMiniPlayer,
+                        disabledMessage = "The mini player is built into the Floating Navigation Bar, so this has no effect. Turn off the Floating Navigation Bar (Liquid Glass settings) first to use this",
                         onClick = { showMiniPlayerBackgroundDialog = true }
                     )
                 )
@@ -1304,7 +1321,9 @@ highlightKey: String? = null) {
                         }
                     }
                 ),
-                if (!useNewPlayerDesign) Material3SettingsItem(
+                Material3SettingsItem(
+                    enabled = !useNewPlayerDesign,
+                    disabledMessage = "Turn on Apple Music Inspired first to use this setting",
     isHighlighted = (highlightKey == "Hide volume slider"),
                     icon = painterResource(R.drawable.linear_scale),
                     title = { Text("Hide volume slider") },
@@ -1325,7 +1344,7 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { onHidePlayerSliderChange(!hidePlayerSlider) }
-                ) else null,
+                ),
                 Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.player_background_style)),
                     icon = painterResource(R.drawable.gradient),
@@ -1347,7 +1366,9 @@ highlightKey: String? = null) {
                         showPlayerBackgroundDialog = true 
                     }
                 ),
-                if (playerBackground != PlayerBackgroundStyle.APPLE_MUSIC) Material3SettingsItem(
+                Material3SettingsItem(
+                    enabled = playerBackground != PlayerBackgroundStyle.APPLE_MUSIC,
+                    disabledMessage = "Not available with the Apple Music player background. Change Player background style first",
     isHighlighted = (highlightKey == stringResource(R.string.hide_player_thumbnail)),
                     icon = painterResource(R.drawable.hide_image),
                     title = { Text(stringResource(R.string.hide_player_thumbnail)) },
@@ -1368,8 +1389,10 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { onHidePlayerThumbnailChange(!hidePlayerThumbnail) }
-                ) else null,
-                if (playerBackground != PlayerBackgroundStyle.APPLE_MUSIC) Material3SettingsItem(
+                ),
+                Material3SettingsItem(
+                    enabled = playerBackground != PlayerBackgroundStyle.APPLE_MUSIC,
+                    disabledMessage = "Not available with the Apple Music player background. Change Player background style first",
     isHighlighted = (highlightKey == stringResource(R.string.thumbnail_corner_radius)),
                     icon = painterResource(R.drawable.image),
                     title = { Text(stringResource(R.string.thumbnail_corner_radius)) },
@@ -1382,8 +1405,10 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { showThumbnailCornerRadiusDialog = true }
-                ) else null,
-                if (playerBackground != PlayerBackgroundStyle.APPLE_MUSIC) Material3SettingsItem(
+                ),
+                Material3SettingsItem(
+                    enabled = playerBackground != PlayerBackgroundStyle.APPLE_MUSIC,
+                    disabledMessage = "Not available with the Apple Music player background. Change Player background style first",
     isHighlighted = (highlightKey == stringResource(R.string.crop_album_art)),
                     icon = painterResource(R.drawable.crop),
                     title = { Text(stringResource(R.string.crop_album_art)) },
@@ -1404,7 +1429,7 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { onCropAlbumArtChange(!cropAlbumArt) }
-                ) else null,
+                ),
                 Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.player_buttons_style)),
                     icon = painterResource(R.drawable.palette),
@@ -1612,9 +1637,13 @@ highlightKey: String? = null) {
                             }
                         )
                     },
+                    enabled = dynamicIslandEnabled,
+                    disabledMessage = "Turn on Dynamic Island first to change its style",
                     onClick = { showDynamicIslandStyleDialog = true }
                 ),
-                if (swipeThumbnail) Material3SettingsItem(
+                Material3SettingsItem(
+                    enabled = swipeThumbnail,
+                    disabledMessage = "Turn on Swipe to change song on thumbnail first",
     isHighlighted = (highlightKey == stringResource(R.string.swipe_sensitivity)),
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.swipe_sensitivity)) },
@@ -1627,7 +1656,7 @@ highlightKey: String? = null) {
                         )
                     },
                     onClick = { showSensitivityDialog = true }
-                ) else null
+                )
             )
         )
 
@@ -1773,8 +1802,10 @@ highlightKey: String? = null) {
                     },
                     onClick = { onLyricsGlowEffectChange(!lyricsGlowEffect) }
                 ),
-                if (lyricsAnimationStyle == LyricsAnimationStyle.jaatplayer_1) {
+                run {
                     Material3SettingsItem(
+                        enabled = lyricsAnimationStyle == LyricsAnimationStyle.jaatplayer_1,
+                        disabledMessage = "Only works with the ${stringResource(R.string.jaatplayer_1)} lyrics animation style. Change Lyrics animation style first",
     isHighlighted = (highlightKey == stringResource(R.string.apple_music_lyrics_blur)),
                         icon = painterResource(R.drawable.lyrics),
                         title = { Text(stringResource(R.string.apple_music_lyrics_blur)) },
@@ -1796,7 +1827,7 @@ highlightKey: String? = null) {
                         },
                         onClick = { onAppleMusicLyricsBlurChange(!appleMusicLyricsBlur) }
                     )
-                } else null,
+                },
                 Material3SettingsItem(
     isHighlighted = (highlightKey == stringResource(R.string.standard_lyrics_blur)),
                     icon = painterResource(R.drawable.lyrics),

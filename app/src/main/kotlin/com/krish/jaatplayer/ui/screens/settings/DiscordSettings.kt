@@ -489,6 +489,9 @@ fun DiscordSettings(
                 }
             }
 
+            val isDiscordConnected = discordToken.isNotEmpty()
+            val discordReason = "Connect to Discord to customize Rich Presence settings"
+
             item {
                 PreferenceGroup(title = stringResource(R.string.discord_connection_settings)) {
                     item {
@@ -499,6 +502,8 @@ fun DiscordSettings(
                             values = DiscordActivityStatusOptions,
                             valueText = { discordPresenceStatusLabel(it) },
                             onValueSelected = onActivityStatusSelectionChange,
+                            isEnabled = isDiscordConnected,
+                            disabledClickReason = discordReason,
                         )
                     }
 
@@ -510,6 +515,8 @@ fun DiscordSettings(
                             values = DiscordPlatformOptions,
                             valueText = { discordPlatformLabel(it) },
                             onValueSelected = onPlatformSelectionChange,
+                            isEnabled = isDiscordConnected,
+                            disabledClickReason = discordReason,
                         )
                     }
                 }
@@ -524,6 +531,8 @@ fun DiscordSettings(
                             onValueSelected = onNameSourceChange,
                             valueText = { activitySourceLabel(it) },
                             icon = { Icon(painterResource(R.drawable.edit), null) },
+                            isEnabled = isDiscordConnected,
+                            disabledClickReason = discordReason,
                         )
                     }
                     item {
@@ -533,6 +542,8 @@ fun DiscordSettings(
                             onValueSelected = onDetailsSourceChange,
                             valueText = { activitySourceLabel(it) },
                             icon = { Icon(painterResource(R.drawable.edit), null) },
+                            isEnabled = isDiscordConnected,
+                            disabledClickReason = discordReason,
                         )
                     }
                     item {
@@ -542,6 +553,8 @@ fun DiscordSettings(
                             onValueSelected = onStateSourceChange,
                             valueText = { activitySourceLabel(it) },
                             icon = { Icon(painterResource(R.drawable.edit), null) },
+                            isEnabled = isDiscordConnected,
+                            disabledClickReason = discordReason,
                         )
                     }
 
@@ -552,6 +565,8 @@ fun DiscordSettings(
                             icon = { Icon(painterResource(R.drawable.pause), null) },
                             checked = showWhenPaused,
                             onCheckedChange = { showWhenPaused = it },
+                            isEnabled = isDiscordConnected,
+                            disabledClickReason = discordReason,
                         )
                     }
 
@@ -563,6 +578,8 @@ fun DiscordSettings(
                             values = DiscordActivityTypeOptions,
                             valueText = { discordActivityTypeLabel(it) },
                             onValueSelected = onActivityTypeChange,
+                            isEnabled = isDiscordConnected,
+                            disabledClickReason = discordReason,
                         )
                     }
                 }

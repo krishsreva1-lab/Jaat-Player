@@ -608,9 +608,11 @@ highlightKey: String? = null) {
                         onClick = { aiRecommendations = !aiRecommendations }
                     )
                 )
-                if (aiRecommendations) {
+                run {
                     add(
                         Material3SettingsItem(
+                            enabled = aiRecommendations,
+                            disabledMessage = "Turn on AI recommendations first",
                             isHighlighted = false,
                             icon = painterResource(R.drawable.sync),
                             title = { Text(stringResource(R.string.ai_recommendations_refresh)) },

@@ -194,6 +194,8 @@ fun UpdateSettings(
                             }
                         )
                     },
+                    enabled = autoUpdateEnabled,
+                    disabledMessage = "Turn on automatic update checks first",
                     onClick = {
                         if (autoUpdateEnabled) {
                             autoDownloadUpdateEnabled = !autoDownloadUpdateEnabled

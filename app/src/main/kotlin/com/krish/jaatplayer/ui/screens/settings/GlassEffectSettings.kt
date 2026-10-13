@@ -126,6 +126,15 @@ fun GlassEffectSettings(
         UseFloatingNavBarKey, defaultValue = false
     )
 
+    // The effect / appearance tuning below only changes the nav bar, mini player and player
+    // glass, which exist only while the Floating Navigation Bar AND Liquid Glass are on.
+    val glassActive = globalEnabled && useFloatingNavBar
+    val glassOffMessage = if (useFloatingNavBar) {
+        "Turn on Liquid Glass first to use this setting"
+    } else {
+        "Turn on Floating Navigation Bar and Liquid Glass first to use this setting"
+    }
+
     var showVibrancyDialog by rememberSaveable { mutableStateOf(false) }
     var showBlurRadiusDialog by rememberSaveable { mutableStateOf(false) }
     var showLensHeightDialog by rememberSaveable { mutableStateOf(false) }
@@ -211,6 +220,8 @@ fun GlassEffectSettings(
                             }
                         )
                     },
+                    enabled = useFloatingNavBar,
+                    disabledMessage = "Turn on Floating Navigation Bar first to use Liquid Glass",
                     onClick = { if (useFloatingNavBar) onGlobalEnabledChange(!globalEnabled) }
                 )
             )
@@ -225,22 +236,30 @@ fun GlassEffectSettings(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.liquid_glass_vibrancy)) },
                     description = { Text(stringResource(R.string.liquid_glass_vibrancy_desc)) },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { showVibrancyDialog = true }
                 ),
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.liquid_glass_blur_radius)) },
                     description = { Text(stringResource(R.string.liquid_glass_blur_radius_desc)) },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { showBlurRadiusDialog = true }
                 ),
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.liquid_glass_lens_height)) },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { showLensHeightDialog = true }
                 ),
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.liquid_glass_lens_amount)) },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { showLensAmountDialog = true }
                 ),
                 Material3SettingsItem(
@@ -261,6 +280,8 @@ fun GlassEffectSettings(
                             }
                         )
                     },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { onChromaticAberrationChange(!chromaticAberration) }
                 ),
                 Material3SettingsItem(
@@ -281,6 +302,8 @@ fun GlassEffectSettings(
                             }
                         )
                     },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { onDepthEffectChange(!depthEffect) }
                 ),
             )
@@ -295,6 +318,8 @@ fun GlassEffectSettings(
                     icon = painterResource(R.drawable.palette),
                     title = { Text(stringResource(R.string.liquid_glass_surface_tint)) },
                     description = { Text(stringResource(R.string.liquid_glass_surface_tint_desc)) },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { showSurfaceTintDialog = true }
                 ),
                 Material3SettingsItem(
@@ -322,12 +347,16 @@ fun GlassEffectSettings(
                     icon = painterResource(R.drawable.tune),
                     title = { Text(stringResource(R.string.liquid_glass_surface_opacity)) },
                     description = { Text(stringResource(R.string.liquid_glass_surface_opacity_desc)) },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { showSurfaceOpacityDialog = true }
                 ),
                 Material3SettingsItem(
                     icon = painterResource(R.drawable.palette),
                     title = { Text(stringResource(R.string.liquid_glass_text_color)) },
                     description = { Text(stringResource(R.string.liquid_glass_text_color_desc)) },
+                    enabled = glassActive,
+                    disabledMessage = glassOffMessage,
                     onClick = { showTextColorDialog = true }
                 ),
             )

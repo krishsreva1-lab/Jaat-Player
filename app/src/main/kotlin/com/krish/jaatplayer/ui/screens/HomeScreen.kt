@@ -155,6 +155,7 @@ import com.krish.jaatplayer.ui.component.ArtistGridItem
 import com.krish.jaatplayer.ui.component.ChipsRow
 import com.krish.jaatplayer.ui.component.DonationDialog
 import com.krish.jaatplayer.ui.component.HideOnScrollFAB
+import com.krish.jaatplayer.ui.component.HomeBackground
 import com.krish.jaatplayer.ui.component.LocalBottomSheetPageState
 import com.krish.jaatplayer.ui.component.LocalMenuState
 import com.krish.jaatplayer.ui.component.NavigationTitle
@@ -1300,6 +1301,8 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.TopStart
         ) {
+            // Optional custom background (Settings > Appearance > Home background); draws nothing when off.
+            HomeBackground(contentLoaded = homePage != null)
             val context = LocalContext.current
             val (nextDonationPromptTime, onNextDonationPromptTimeChange) = rememberPreference(
                 NextDonationPromptTimeKey, defaultValue = 0L
