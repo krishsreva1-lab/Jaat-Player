@@ -113,6 +113,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import com.krish.jaatplayer.ui.component.TopHeaderGlassDock
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
@@ -1048,49 +1049,7 @@ class MainActivity : ComponentActivity() {
                                                 ),
                                             )
                                         },
-                                        actions = {
-                                            if (showHistoryButton) {
-                                                IconButton(onClick = { navController.navigate("history") }) {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.music_history),
-                                                        contentDescription = stringResource(R.string.history)
-                                                    )
-                                                }
-                                            }
-                                            IconButton(onClick = { navController.navigate("stats") }) {
-                                                Icon(
-                                                    painter = painterResource(R.drawable.stats),
-                                                    contentDescription = stringResource(R.string.stats)
-                                                )
-                                            }
-                                            if (listenTogetherInTopBar) {
-                                                IconButton(onClick = { navController.navigate("listen_together_from_topbar") }) {
-                                                    Icon(
-                                                        painter = painterResource(R.drawable.group_outlined),
-                                                        contentDescription = stringResource(R.string.together)
-                                                    )
-                                                }
-                                            }
-                                             IconButton(onClick = { showSettingDialoge = true }) {
-                                                BadgedBox(badge = {}) {
-                                                    if (accountImageUrl != null) {
-                                                        AsyncImage(
-                                                            model = accountImageUrl,
-                                                            contentDescription = stringResource(R.string.account),
-                                                            modifier = Modifier
-                                                                .size(24.dp)
-                                                                .clip(CircleShape)
-                                                        )
-                                                     } else {
-                                                         Icon(
-                                                             painter = painterResource(R.drawable.settings),
-                                                             contentDescription = stringResource(R.string.account),
-                                                             modifier = Modifier.size(24.dp)
-                                                         )
-                                                     }
-                                                }
-                                            }
-                                        },
+                                        actions = {},
                                         scrollBehavior = topAppBarScrollBehavior,
                                         colors = TopAppBarDefaults.topAppBarColors(
                                             containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
@@ -1403,6 +1362,26 @@ class MainActivity : ComponentActivity() {
                                         activity = this@MainActivity,
                                         snackbarHostState = snackbarHostState
                                     )
+                                }
+
+                                if (shouldShowTopBar) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Top))
+                                            .padding(top = 8.dp, end = 12.dp)
+                                    ) {
+                                        TopHeaderGlassDock(
+                                            showHistoryButton = showHistoryButton,
+                                            listenTogetherInTopBar = listenTogetherInTopBar,
+                                            accountImageUrl = accountImageUrl,
+                                            pureBlack = pureBlack,
+                                            onHistoryClick = { navController.navigate("history") },
+                                            onStatsClick = { navController.navigate("stats") },
+                                            onListenTogetherClick = { navController.navigate("listen_together_from_topbar") },
+                                            onSettingsClick = { showSettingDialoge = true },
+                                        )
+                                    }
                                 }
                             }
                         }
