@@ -218,6 +218,7 @@ import com.krish.jaatplayer.ui.screens.settings.DarkMode
 import com.krish.jaatplayer.ui.theme.PlayerColorExtractor
 import com.krish.jaatplayer.ui.theme.PlayerSliderColors
 import com.krish.jaatplayer.ui.utils.ShowMediaInfo
+import com.krish.jaatplayer.ui.utils.pressWobble
 import com.krish.jaatplayer.ui.utils.ShowOffsetDialog
 import com.krish.jaatplayer.utils.makeTimeString
 import com.krish.jaatplayer.utils.isLocalMediaId
@@ -3515,12 +3516,28 @@ private fun LiquidGlassPuckButton(
     val glassConfig = com.krish.jaatplayer.ui.component.LocalGlassEffectConfig.current
     val useGlass = glassConfig.globalEnabled && com.krish.jaatplayer.ui.component.isGlassSupported()
 
+    val interactionSource = remember { MutableInteractionSource() }
+
     val glassModifier = if (useGlass) {
         Modifier
             .clip(puckShape)
+            // Pure liquid glass (backdrop blur + lens refraction) with no flat tint on top, so the
+            // artwork really bends through the button like the nav bar puck. Only a thin rim
+            // highlight that fades around the edge, like a refracting glass lip.
             .liquidGlass(config = glassConfig, shape = puckShape)
-            .background(buttonColor.copy(alpha = 0.22f))
-            .border(BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)), shape = puckShape)
+            .border(
+                BorderStroke(
+                    0.75.dp,
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.55f),
+                            Color.White.copy(alpha = 0.08f),
+                            Color.White.copy(alpha = 0.25f),
+                        )
+                    )
+                ),
+                shape = puckShape
+            )
     } else {
         Modifier
             .clip(puckShape)
@@ -3530,9 +3547,15 @@ private fun LiquidGlassPuckButton(
 
     Box(
         modifier = modifier
+            .pressWobble(interactionSource) // springy jelly squash on press
             .size(44.dp)
             .then(glassModifier)
-            .clickable(enabled = enabled, onClick = onClick),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.foundation.LocalIndication.current,
+                enabled = enabled,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides contentColor) {

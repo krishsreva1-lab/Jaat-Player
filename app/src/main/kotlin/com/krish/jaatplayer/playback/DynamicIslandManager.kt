@@ -80,7 +80,11 @@ class DynamicIslandManager(private val service: MusicService) {
             dismissedForTrackId = service.currentMediaMetadata.value?.id
             island.hide()
         }
-        island.onExpandedChanged = { if (it) pushProgress() }
+        island.onExpandedChanged = { expanded ->
+            if (expanded) pushProgress()
+            // Collapsing a card on a stopped track starts the 5 s close timer.
+            else refresh()
+        }
 
         service.dataStore.data
             .map { it[DynamicIslandEnabledKey] ?: false }
@@ -121,6 +125,7 @@ class DynamicIslandManager(private val service: MusicService) {
     fun release() {
         ProcessLifecycleOwner.get().lifecycle.removeObserver(lifecycleObserver)
         artJob?.cancel()
+        cancelLinger()
         island.hide()
         scope.cancel()
     }
@@ -153,30 +158,67 @@ class DynamicIslandManager(private val service: MusicService) {
         }
     }
 
+    /** Pending "music stopped, close the island" timer. */
+    private var lingerJob: Job? = null
+
+    private fun cancelLinger() {
+        lingerJob?.cancel()
+        lingerJob = null
+    }
+
     fun refresh() {
         val metadata = service.currentMediaMetadata.value
         val overlayPermitted = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(service)
+        val playing = service.player.isPlaying
 
-        val shouldShow =
+        val allowed =
             !isAppInForeground &&
                 featureEnabled &&
                 overlayPermitted &&
-                service.player.isPlaying &&
                 metadata != null &&
                 metadata.id != dismissedForTrackId
 
-        if (!shouldShow) {
-            // Paused / backgrounded-but-not-playing just hides; keep the art cache for resume.
+        if (!allowed) {
+            // App opened, feature off, swiped away...: pull back into the camera right away.
+            cancelLinger()
             island.hide()
             return
         }
 
-        loadArt(metadata!!.id, metadata.thumbnailUrl)
-        island.show(
-            title = metadata.title,
+        if (playing) {
+            cancelLinger()
+            loadArt(metadata!!.id, metadata.thumbnailUrl)
+            island.show(
+                title = metadata.title,
+                artist = metadata.artists.joinToString { it.name },
+                isPlaying = true,
+            )
+            if (island.isExpanded) pushProgress()
+            return
+        }
+
+        // Stopped / paused: if the island is up, keep it for a few seconds (waveform at rest)
+        // and then let it slide back into the camera. It never pops up for a paused track.
+        if (!island.isShowing) return
+        island.update(
+            title = metadata!!.title,
             artist = metadata.artists.joinToString { it.name },
-            isPlaying = service.player.isPlaying,
+            isPlaying = false,
         )
-        if (island.isExpanded) pushProgress()
+        if (island.isExpanded) {
+            // Don't close a card the user is looking at; re-check once it is collapsed.
+            cancelLinger()
+            return
+        }
+        if (lingerJob?.isActive == true) return
+        lingerJob = scope.launch {
+            delay(LINGER_AFTER_STOP_MS)
+            lingerJob = null
+            if (!service.player.isPlaying && !island.isExpanded) island.hide()
+        }
+    }
+
+    private companion object {
+        const val LINGER_AFTER_STOP_MS = 5_000L
     }
 }

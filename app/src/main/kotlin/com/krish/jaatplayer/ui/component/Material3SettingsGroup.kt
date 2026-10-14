@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import android.widget.Toast
 import androidx.compose.runtime.remember
@@ -108,14 +107,15 @@ private fun Material3SettingsItemRow(
     // A greyed-out row that knows WHY it is greyed out: tapping it (or its switch) shows
     // the reason instead of doing nothing. See Material3SettingsItem.disabledMessage.
     val context = LocalContext.current
+    val effectiveDisabledMessage = item.disabledClickReason ?: item.disabledMessage
     val showDisabledMessage: () -> Unit = {
-        item.disabledMessage?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+        effectiveDisabledMessage?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
     }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
-                enabled = item.enabled && item.onClick != null || !item.enabled && item.disabledMessage != null,
+                enabled = item.enabled && item.onClick != null || !item.enabled && effectiveDisabledMessage != null,
                 onClick = { if (item.enabled) item.onClick?.invoke() else showDisabledMessage() }
             )
             .then(if (scrollState != null) Modifier.scrollToOnHighlight(scrollState, item.isHighlighted) else Modifier)
@@ -304,5 +304,6 @@ data class Material3SettingsItem(
     val enabled: Boolean = true,
     val onClick: (() -> Unit)? = null,
     /** Shown as a toast when the user taps this item while [enabled] is false. */
-    val disabledMessage: String? = null
+    val disabledMessage: String? = null,
+    val disabledClickReason: String? = null
 )

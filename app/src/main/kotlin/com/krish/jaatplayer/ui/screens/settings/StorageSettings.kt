@@ -130,6 +130,8 @@ fun StorageSettings(
 
     val pickerNotAvailableMsg = stringResource(R.string.picker_not_available)
     val exportDirUnavailableMsg = stringResource(R.string.export_directory_unavailable)
+    val exportDirNotSetMsg = stringResource(R.string.export_directory_not_set)
+    val noDownloadedSongsMsg = stringResource(R.string.no_downloaded_songs)
 
     val launchExportPicker: () -> Unit = remember(
         isPickerSupported,
@@ -405,6 +407,57 @@ fun StorageSettings(
                         )
                     },
                     onClick = { launchExportPicker() }
+                ),
+                Material3SettingsItem(
+                    isHighlighted = (highlightKey == stringResource(R.string.export_downloaded_songs)),
+                    icon = painterResource(R.drawable.file_export),
+                    title = { Text(stringResource(R.string.export_downloaded_songs)) },
+                    description = { Text(stringResource(R.string.export_downloaded_songs_desc)) },
+                    onClick = {
+                        if (exportDirectoryUri.isBlank()) {
+                            Toast.makeText(
+                                context,
+                                exportDirNotSetMsg,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            coroutineScope.launch(Dispatchers.IO) {
+                                val downloadedSongs = try {
+                                    database.downloadedSongsByNameAsc().first()
+                                } catch (e: Exception) {
+                                    emptyList()
+                                }
+                                if (downloadedSongs.isEmpty()) {
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        Toast.makeText(
+                                            context,
+                                            noDownloadedSongsMsg,
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                } else {
+                                    coroutineScope.launch(Dispatchers.Main) {
+                                        Toast.makeText(
+                                            context,
+                                            "Exporting ${downloadedSongs.size} downloaded song(s)...",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                    downloadedSongs.forEach { song ->
+                                        com.krish.jaatplayer.playback.AudioExportService.start(
+                                            context = context,
+                                            songId = song.id,
+                                            songTitle = song.song.title,
+                                            songArtist = song.artists.joinToString(", ") { it.name },
+                                            songAlbum = song.song.albumName ?: "",
+                                            artworkUrl = song.thumbnailUrl ?: "",
+                                            targetDirectoryUri = exportDirectoryUri
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 )
             )
         )

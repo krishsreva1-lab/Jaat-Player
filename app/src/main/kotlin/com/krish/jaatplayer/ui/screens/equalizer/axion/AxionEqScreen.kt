@@ -24,7 +24,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -285,12 +289,6 @@ private fun SimpleEqMode(
         R.string.eq_preset_dolby_focused to floatArrayOf(-300f, -50f, 130f, 180f, 220f, 120f, 140f, 100f, -50f, -300f),
     )
 
-    val diracPresets = listOf(
-        R.string.eq_preset_dirac_music to floatArrayOf(200f, 140f, 80f, 0f, 30f, 80f, 140f, 200f, 280f, 350f),
-        R.string.eq_preset_dirac_movie to floatArrayOf(300f, 250f, 150f, 0f, 70f, 120f, 180f, 250f, 320f, 400f),
-        R.string.eq_preset_dirac_game to floatArrayOf(150f, 250f, 200f, 0f, 80f, 150f, 300f, 450f, 400f, 280f),
-    )
-
     val customProfiles by viewModel.customProfiles.collectAsState()
     var showManageDialog by remember { mutableStateOf(false) }
 
@@ -368,7 +366,6 @@ private fun SimpleEqMode(
             )
         }
         PresetSection(stringResource(R.string.eq_label_dolby), dolbyPresets, null, enabled, viewModel, bandGains)
-        PresetSection(stringResource(R.string.eq_label_dirac), diracPresets, null, enabled, viewModel, bandGains)
 
         ReverbSection(
             reverbPreset = reverbPreset,
@@ -397,9 +394,6 @@ private fun JaatStylesSection(
 ) {
     val jaatStylesEnabled by viewModel.jaatStylesEnabled.collectAsState()
     val jaatStylesIntensity by viewModel.jaatStylesIntensity.collectAsState()
-    val jaatStylesManualPositionEnabled by viewModel.jaatStylesManualPositionEnabled.collectAsState()
-    val jaatStylesManualPan by viewModel.jaatStylesManualPan.collectAsState()
-    val jaatStylesManualDepth by viewModel.jaatStylesManualDepth.collectAsState()
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -455,57 +449,6 @@ private fun JaatStylesSection(
                     valueRange = 0f..1f,
                     enabled = enabled
                 )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Manual Position",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Switch(
-                    checked = jaatStylesManualPositionEnabled,
-                    onCheckedChange = { viewModel.setJaatStylesManualPositionEnabled(it) },
-                    enabled = enabled
-                )
-            }
-
-            if (jaatStylesManualPositionEnabled) {
-                Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Left", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Right", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Slider(
-                        value = jaatStylesManualPan,
-                        onValueChange = { viewModel.setJaatStylesManualPan(it) },
-                        valueRange = -1f..1f,
-                        enabled = enabled
-                    )
-                }
-
-                Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Behind", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Front", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Slider(
-                        value = jaatStylesManualDepth,
-                        onValueChange = { viewModel.setJaatStylesManualDepth(it) },
-                        valueRange = -1f..1f,
-                        enabled = enabled
-                    )
-                }
             }
         }
     }
@@ -582,7 +525,12 @@ private fun VocalRemoverSection(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "Vocal / Music Remover",
+            text = buildAnnotatedString {
+                withStyle(style = SpanStyle(fontStyle = FontStyle.Italic)) {
+                    append("beta ")
+                }
+                append("Vocal / Music Remover")
+            },
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)

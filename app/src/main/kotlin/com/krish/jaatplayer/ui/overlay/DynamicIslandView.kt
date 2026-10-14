@@ -1,15 +1,22 @@
 package com.krish.jaatplayer.ui.overlay
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.TimeInterpolator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.os.Build
@@ -17,38 +24,58 @@ import android.os.SystemClock
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
+import android.view.animation.AccelerateInterpolator
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.LinearInterpolator
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.palette.graphics.Palette
 import com.krish.jaatplayer.R
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.random.Random
 
 /**
  * Camera-anchored "Dynamic Island".
  *
  * Collapsed: a small black pill locked to the front-camera cut-out at the top-centre of the
- * screen (album art on the left, animated waveform on the right). It never moves - there is
- * no dragging.
+ * screen (album art on the left, animated waveform on the right).
  *
- * Expanded (tap): the pill grows into a translucent purple-grey player card just under the
- * status bar - artwork, title, artist, waveform, progress bar with times, and
- * previous / play-pause / next. Tap outside the card (or on empty card space) to collapse,
- * swipe up to hide it for the rest of the track.
+ * Motion (like the iPhone / vivo / Xiaomi / OnePlus islands): it appears as a dot on the
+ * camera, then springs out sideways (left and right) into the pill, and the content fades in.
+ * Hiding runs the same thing backwards: content fades, the pill pulls back into the camera.
+ * The shape is animated with the view outline (not by scaling), so corners stay perfectly
+ * round and nothing stretches.
+ *
+ * Touch: anywhere on the pill opens the player card. Swipe up on the pill hides it for the
+ * track; swipe up on the open card (or tap outside it) closes it.
+ *
+ * Expanded card: artwork, title, artist, waveform, progress, previous / play-pause / next,
+ * on either the blurred album art or a gradient built from the album's dominant colours.
  */
 class DynamicIslandView(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-    private var root: LinearLayout? = null
+    /** The visible shape, animated. Per root so a hide animation never fights a new show. */
+    private class Body(var w: Float = 0f, var h: Float = 0f, var top: Float = 0f, var maxRadius: Float = 0f)
+
+    private var root: FrameLayout? = null
+    private var body = Body()
+    private var bodyAnim: ValueAnimator? = null
     private var params: WindowManager.LayoutParams? = null
+    private var bgView: View? = null
     private var collapsedView: LinearLayout? = null
     private var expandedView: LinearLayout? = null
 
@@ -63,6 +90,7 @@ class DynamicIslandView(private val context: Context) {
     private val waveViews = mutableListOf<WaveView>()
 
     private var artBitmap: Bitmap? = null
+    private var blurredArt: Bitmap? = null
     private var lastIsPlaying = true
 
     var isExpanded = false
@@ -81,6 +109,7 @@ class DynamicIslandView(private val context: Context) {
     private var pillTop = 0
     private var pillX = 0          // horizontal offset so the pill sits exactly on the camera hole
     private var cardTopPad = 0     // expanded card top padding (content starts below the camera)
+    private var cameraD = 0        // diameter of the dot the island grows out of / shrinks into
 
     val isShowing: Boolean get() = root != null
 
@@ -96,13 +125,7 @@ class DynamicIslandView(private val context: Context) {
         if (r.parent == null && !r.isAttachedToWindow) {
             try {
                 windowManager.addView(r, params)
-                r.pivotY = 0f
-                r.pivotX = pillW / 2f
-                r.alpha = 0f
-                r.scaleX = 0.7f
-                r.scaleY = 0.7f
-                r.animate().alpha(1f).scaleX(1f).scaleY(1f)
-                    .setDuration(220).setInterpolator(DecelerateInterpolator()).start()
+                playEmerge(r)
             } catch (e: Exception) {
                 root = null
             }
@@ -126,45 +149,101 @@ class DynamicIslandView(private val context: Context) {
         applyBackground()
     }
 
-    private var primaryBgColor = Color.argb(244, 30, 25, 45)
-    private var secondaryBgColor = Color.argb(250, 12, 10, 18)
+    // Gradient built from the album's dominant colours (start -> mid -> end).
+    private var gradStart = Color.rgb(48, 40, 72)
+    private var gradEnd = Color.rgb(16, 13, 24)
 
     fun setArt(bitmap: Bitmap?) {
         artBitmap = bitmap
         extractPaletteColors()
+        blurredArt = bitmap?.let { runCatching { buildBlurred(it) }.getOrNull() }
         applyArt()
         applyBackground()
     }
 
+    /**
+     * Dominant colours by pixel population: the colour that covers the most of the artwork
+     * leads the gradient, the most common clearly-different colour finishes it. (The old
+     * code used Palette's dark-muted swatch for the second stop and then multiplied it down
+     * to near black, so every card looked like one colour fading to black.)
+     */
     private fun extractPaletteColors() {
         val bitmap = artBitmap
         if (bitmap == null) {
-            primaryBgColor = Color.argb(244, 30, 25, 45)
-            secondaryBgColor = Color.argb(250, 12, 10, 18)
+            gradStart = Color.rgb(48, 40, 72)
+            gradEnd = Color.rgb(16, 13, 24)
             return
         }
         runCatching {
-            val palette = Palette.from(bitmap).generate()
-            // Dominant swatch has the highest pixel count (population) in the album art (e.g. main background)
-            val dominantSwatch = palette.dominantSwatch ?: palette.swatches.maxByOrNull { it.population }
-            val rawPrimary = dominantSwatch?.rgb ?: palette.vibrantSwatch?.rgb ?: Color.argb(244, 30, 25, 45)
+            val n = 48
+            val small = Bitmap.createScaledBitmap(bitmap, n, n, true)
+            val px = IntArray(n * n)
+            small.getPixels(px, 0, n, 0, 0, n, n)
 
-            val darkSwatch = palette.darkMutedSwatch ?: palette.darkVibrantSwatch ?: palette.mutedSwatch
-            val rawSecondary = darkSwatch?.rgb ?: rawPrimary
+            val weight = FloatArray(4096)
+            val sumR = IntArray(4096)
+            val sumG = IntArray(4096)
+            val sumB = IntArray(4096)
+            val cnt = IntArray(4096)
+            var total = 0f
+            for (p in px) {
+                if (Color.alpha(p) < 128) continue
+                val r = Color.red(p)
+                val g = Color.green(p)
+                val b = Color.blue(p)
+                val key = ((r shr 4) shl 8) or ((g shr 4) shl 4) or (b shr 4)
+                val lum = (0.299f * r + 0.587f * g + 0.114f * b)
+                // Pure black / white borders shouldn't win just by being big.
+                val w = if (lum < 22f || lum > 238f) 0.35f else 1f
+                weight[key] += w
+                sumR[key] += r; sumG[key] += g; sumB[key] += b; cnt[key]++
+                total += w
+            }
+            fun colorOf(k: Int) = Color.rgb(sumR[k] / cnt[k], sumG[k] / cnt[k], sumB[k] / cnt[k])
 
-            val r1 = (Color.red(rawPrimary) * 0.85f).toInt().coerceIn(0, 255)
-            val g1 = (Color.green(rawPrimary) * 0.85f).toInt().coerceIn(0, 255)
-            val b1 = (Color.blue(rawPrimary) * 0.85f).toInt().coerceIn(0, 255)
-            primaryBgColor = Color.argb(244, r1, g1, b1)
+            var best = -1
+            for (k in 0 until 4096) if (cnt[k] > 0 && (best == -1 || weight[k] > weight[best])) best = k
+            if (best == -1) return@runCatching
+            val c1 = colorOf(best)
 
-            val r2 = (Color.red(rawSecondary) * 0.45f).toInt().coerceIn(0, 255)
-            val g2 = (Color.green(rawSecondary) * 0.45f).toInt().coerceIn(0, 255)
-            val b2 = (Color.blue(rawSecondary) * 0.45f).toInt().coerceIn(0, 255)
-            secondaryBgColor = Color.argb(252, r2, g2, b2)
+            fun dist(a: Int, b: Int): Float {
+                val dr = (Color.red(a) - Color.red(b)).toFloat()
+                val dg = (Color.green(a) - Color.green(b)).toFloat()
+                val db = (Color.blue(a) - Color.blue(b)).toFloat()
+                return kotlin.math.sqrt(dr * dr + dg * dg + db * db)
+            }
+            var second = -1
+            for (k in 0 until 4096) {
+                if (cnt[k] == 0 || weight[k] < total * 0.03f) continue
+                if (dist(colorOf(k), c1) < 80f) continue
+                if (second == -1 || weight[k] > weight[second]) second = k
+            }
+            val c2 = if (second != -1) colorOf(second) else shade(c1, 0.55f)
+
+            gradStart = tone(c1, 0.50f)
+            gradEnd = tone(c2, 0.40f)
         }.onFailure {
-            primaryBgColor = Color.argb(244, 30, 25, 45)
-            secondaryBgColor = Color.argb(250, 12, 10, 18)
+            gradStart = Color.rgb(48, 40, 72)
+            gradEnd = Color.rgb(16, 13, 24)
         }
+    }
+
+    private fun shade(c: Int, f: Float) =
+        Color.rgb((Color.red(c) * f).toInt(), (Color.green(c) * f).toInt(), (Color.blue(c) * f).toInt())
+
+    /** Keeps the colour but caps brightness so white text stays readable, and lifts near-black. */
+    private fun tone(c: Int, maxLum: Float): Int {
+        var r = Color.red(c).toFloat()
+        var g = Color.green(c).toFloat()
+        var b = Color.blue(c).toFloat()
+        val lum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f
+        if (lum > maxLum) {
+            val k = maxLum / lum
+            r *= k; g *= k; b *= k
+        } else if (lum < 0.10f) {
+            r += (255f - r) * 0.12f; g += (255f - g) * 0.12f; b += (255f - b) * 0.12f
+        }
+        return Color.rgb(r.toInt().coerceIn(0, 255), g.toInt().coerceIn(0, 255), b.toInt().coerceIn(0, 255))
     }
 
     fun setProgress(positionMs: Long, durationMs: Long) {
@@ -175,32 +254,45 @@ class DynamicIslandView(private val context: Context) {
         timeTotal?.text = formatTime(d)
     }
 
+    /** Pulls the island back into the camera, then removes it. */
     fun hide() {
         val r = root ?: return
+        val st = body
+        val c = collapsedView
+        val e = expandedView
         root = null
         isExpanded = false
         collapsedView = null
         expandedView = null
+        bgView = null
         waveViews.clear()
-        try {
-            r.animate().alpha(0f).scaleX(0.7f).scaleY(0.7f)
-                .setDuration(160)
-                .withEndAction { runCatching { windowManager.removeView(r) } }
-                .start()
-        } catch (e: Exception) {
-            runCatching { windowManager.removeView(r) }
-        }
+        bodyAnim?.cancel()
+        bodyAnim = null
+
+        fun remove() { runCatching { windowManager.removeView(r) } }
+        if (!r.isAttachedToWindow) { remove(); return }
+
+        e?.animate()?.cancel()
+        c?.animate()?.cancel()
+        e?.animate()?.alpha(0f)?.setStartDelay(0)?.setDuration(90)?.start()
+        c?.animate()?.alpha(0f)?.setStartDelay(0)?.setDuration(130)?.start()
+        val cam = cameraD.toFloat()
+        runBodyAnimation(
+            st, r, cam, cam, (pillH - cam) / 2f,
+            durationMs = 300,
+            widthInterpolator = AccelerateInterpolator(1.3f),
+            heightInterpolator = AccelerateInterpolator(1.0f),
+            onEnd = { remove() },
+        )
     }
 
     // ------------------------------------------------------------------ build --
 
     /**
      * Real-world reference (iPhone 14/15/16 Pro, vivo Funtouch "Fun island", Xiaomi HyperOS
-     * island, OnePlus/Realme "capsule"): the idle pill is ~126x37 pt, it widens to ~165-190 pt
-     * while media plays (art left, waveform right, camera hole in the middle), and the expanded
-     * music card is ~ (screen - 24dp) wide and ~170 dp tall with a ~34 dp corner radius.
-     * The pill is always vertically centred on the camera hole and as wide as needed so that
-     * the artwork and the waveform stay clear of it.
+     * island, OnePlus/Realme "capsule"): the idle pill is ~126x37 pt, it widens while media
+     * plays (art left, waveform right, camera hole in the middle), and the expanded music card
+     * is ~ (screen - 24dp) wide with a ~34 dp corner radius.
      */
     private fun computeMetrics() {
         val res = context.resources
@@ -211,8 +303,6 @@ class DynamicIslandView(private val context: Context) {
         // Defaults when no cut-out is reported: sit centred in the status bar.
         var cutW = dp(12)
         var cutH = dp(12)
-        var cutCenterX = screenW / 2
-        var cameraCenterY = statusBarH / 2
         var cutBottom = statusBarH
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             runCatching {
@@ -220,20 +310,20 @@ class DynamicIslandView(private val context: Context) {
                 if (cut != null && !cut.isEmpty) {
                     cutW = cut.width()
                     cutH = cut.height()
-                    cutCenterX = cut.centerX()
-                    cameraCenterY = cut.centerY()
                     cutBottom = cut.bottom
                 }
             }
         }
 
-        // Reference island (measured from the target screenshot, as a fraction of screen
-        // width so it scales to every phone): 36.4 % wide, 9.0 % tall, 1.55 % from the top,
-        // horizontally centred. Art is a 5.5 % rounded square, waveform 5.2 % x 4 % in yellow.
+        // Reference island (fractions of screen width so it scales to every phone): 36.4 %
+        // wide, 9.0 % tall, 1.55 % from the top, horizontally centred.
         pillW = (screenW * 0.364f).toInt()
         pillH = (screenW * 0.0897f).toInt()
         pillTop = (screenW * 0.0155f).toInt()
         pillX = 0
+
+        // The dot it grows out of: the size of the camera hole, never bigger than the pill.
+        cameraD = max(dp(10), min(min(cutW, cutH).coerceAtLeast(dp(10)), (pillH * 0.8f).toInt()))
 
         // Expanded card starts at the pill's top edge; its content starts below the camera.
         cardTopPad = max(dp(20), cutBottom - pillTop + dp(8))
@@ -254,40 +344,6 @@ class DynamicIslandView(private val context: Context) {
             clipToOutline = true
             layoutParams = LinearLayout.LayoutParams(sizePx, sizePx)
         }
-
-    private fun attachCollapsedTouchListener(view: View) {
-        var startY = 0f
-        var startX = 0f
-        var isClick = true
-        view.setOnTouchListener { _, event ->
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    startY = event.rawY
-                    startX = event.rawX
-                    isClick = true
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val dy = event.rawY - startY
-                    val dx = event.rawX - startX
-                    if (dy * dy + dx * dx > dp(8) * dp(8)) {
-                        isClick = false
-                    }
-                    true
-                }
-                MotionEvent.ACTION_UP -> {
-                    val dy = event.rawY - startY
-                    if (dy < -dp(18)) {
-                        onDismissedBySwipe?.invoke()
-                    } else if (isClick || Math.abs(dy) < dp(10)) {
-                        setExpanded(!isExpanded)
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
-    }
 
     private fun buildViews() {
         computeMetrics()
@@ -325,42 +381,35 @@ class DynamicIslandView(private val context: Context) {
         params = lp
 
         // ---------------- collapsed: [art]   (camera)   [waveform] ----------------
-        val artSize = (context.resources.displayMetrics.widthPixels * 0.055f).toInt()
+        val screenW = context.resources.displayMetrics.widthPixels
+        val artSize = (screenW * 0.055f).toInt()
         val cArt = roundedImage(artSize, artSize * 0.2f).apply {
             layoutParams = LinearLayout.LayoutParams(artSize, artSize).apply {
-                marginStart = (context.resources.displayMetrics.widthPixels * 0.025f).toInt()
+                marginStart = (screenW * 0.025f).toInt()
             }
-            isClickable = false
-            isFocusable = false
         }
         collapsedArt = cArt
 
         val spacer = View(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, 1, 1f)
-            isClickable = false
-            isFocusable = false
         }
         val cWave = WaveView(context).apply {
             playing = lastIsPlaying
-            val sw = context.resources.displayMetrics.widthPixels
             barColor = Color.rgb(255, 204, 0)
-            layoutParams = LinearLayout.LayoutParams((sw * 0.052f).toInt(), (sw * 0.04f).toInt())
-                .apply { marginEnd = (sw * 0.027f).toInt() }
-            isClickable = false
-            isFocusable = false
+            layoutParams = LinearLayout.LayoutParams((screenW * 0.052f).toInt(), (screenW * 0.04f).toInt())
+                .apply { marginEnd = (screenW * 0.027f).toInt() }
         }
         waveViews.add(cWave)
 
         val collapsed = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(pillW, pillH)
+            layoutParams = FrameLayout.LayoutParams(pillW, pillH, Gravity.TOP or Gravity.CENTER_HORIZONTAL)
             addView(cArt)
             addView(spacer)
             addView(cWave)
         }
         collapsedView = collapsed
-        attachCollapsedTouchListener(collapsed)
 
         // ---------------- expanded card ----------------
         val eArt = roundedImage(dp(52), dp(12).toFloat())
@@ -485,122 +534,208 @@ class DynamicIslandView(private val context: Context) {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), cardTopPad, dp(20), dp(14))
             visibility = View.GONE
+            alpha = 0f
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP,
+            )
             addView(topRow)
             addView(progressRow)
             addView(controls)
         }
         expandedView = expanded
 
-        val container = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
+        // Album-art / gradient layer; fades in while the pill grows into the card.
+        val bg = View(context).apply {
+            alpha = 0f
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            )
+        }
+        bgView = bg
+
+        val container = FrameLayout(context).apply {
+            background = ColorDrawable(Color.BLACK)
+            addView(bg)
             addView(collapsed)
             addView(expanded)
         }
         root = container
         isExpanded = false
+
+        // Shape = outline, animated; the window itself never has to resize per frame.
+        val st = Body(pillW.toFloat(), pillH.toFloat(), 0f, dp(34).toFloat())
+        body = st
+        container.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                val left = ((view.width - st.w) / 2f).toInt()
+                val top = st.top.toInt()
+                val radius = min(min(st.w, st.h) / 2f, st.maxRadius)
+                outline.setRoundRect(left, top, (left + st.w).toInt(), (top + st.h).toInt(), radius)
+            }
+        }
+        container.clipToOutline = true
+
         applyBackground()
         applyArt()
 
         container.setOnTouchListener { _, event -> handleTouch(event) }
     }
 
+    // --------------------------------------------------------------- animation --
+
+    /** Damped spring: overshoots a few percent and settles, like the system islands. */
+    private class SpringInterpolator(
+        private val damping: Float = 8f,
+        private val frequency: Float = 1.6f,
+    ) : TimeInterpolator {
+        override fun getInterpolation(t: Float): Float {
+            if (t >= 1f) return 1f
+            return 1f - exp(-damping * t) * cos(2f * PI.toFloat() * frequency * t)
+        }
+    }
+
+    private fun runBodyAnimation(
+        st: Body,
+        view: View,
+        toW: Float,
+        toH: Float,
+        toTop: Float,
+        durationMs: Long,
+        widthInterpolator: TimeInterpolator,
+        heightInterpolator: TimeInterpolator,
+        onEnd: (() -> Unit)? = null,
+    ): ValueAnimator {
+        val fromW = st.w
+        val fromH = st.h
+        val fromTop = st.top
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = durationMs
+            interpolator = LinearInterpolator()
+            addUpdateListener {
+                val t = it.animatedFraction
+                val tw = widthInterpolator.getInterpolation(t)
+                val th = heightInterpolator.getInterpolation(t)
+                st.w = fromW + (toW - fromW) * tw
+                st.h = fromH + (toH - fromH) * th
+                st.top = fromTop + (toTop - fromTop) * th
+                view.invalidateOutline()
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                private var cancelled = false
+                override fun onAnimationCancel(animation: Animator) { cancelled = true }
+                override fun onAnimationEnd(animation: Animator) {
+                    if (cancelled) return
+                    st.w = toW; st.h = toH; st.top = toTop
+                    view.invalidateOutline()
+                    onEnd?.invoke()
+                }
+            })
+        }
+        animator.start()
+        return animator
+    }
+
+    /** Dot on the camera -> springs out left and right -> pill; content fades in after. */
+    private fun playEmerge(r: View) {
+        val st = body
+        val cam = cameraD.toFloat()
+        st.w = cam
+        st.h = cam
+        st.top = (pillH - cam) / 2f
+        collapsedView?.alpha = 0f
+        r.invalidateOutline()
+        bodyAnim?.cancel()
+        bodyAnim = runBodyAnimation(
+            st, r, pillW.toFloat(), pillH.toFloat(), 0f,
+            durationMs = 480,
+            widthInterpolator = SpringInterpolator(),
+            heightInterpolator = DecelerateInterpolator(1.6f),
+        )
+        collapsedView?.animate()?.alpha(1f)?.setStartDelay(170)?.setDuration(240)?.start()
+    }
+
     private fun applyBackground() {
-        val r = root ?: return
-        if (isExpanded) {
-            if (expandedStyle == "blurred_art" && artBitmap != null) {
-                val blurred = createDarkBlurredBitmap(artBitmap!!)
-                val bitmapDrawable = BitmapDrawable(context.resources, blurred)
-                r.background = LayerDrawable(
-                    arrayOf(
-                        bitmapDrawable,
-                        GradientDrawable().apply {
-                            shape = GradientDrawable.RECTANGLE
-                            setColor(Color.argb(175, 8, 6, 12))
-                        }
-                    )
-                )
-            } else {
-                r.background = GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    intArrayOf(primaryBgColor, secondaryBgColor)
-                ).apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dp(34).toFloat()
-                }
+        val bg = bgView ?: return
+        val blurred = blurredArt
+        bg.background = if (expandedStyle == "blurred_art" && blurred != null) {
+            val art = BitmapDrawable(context.resources, blurred).apply {
+                isFilterBitmap = true
+                // A little extra saturation so the blur keeps the album's colour.
+                colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(1.35f) })
             }
-            r.outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, dp(34).toFloat())
-                }
-            }
-            r.clipToOutline = true
+            LayerDrawable(
+                arrayOf(
+                    art,
+                    GradientDrawable(
+                        GradientDrawable.Orientation.TOP_BOTTOM,
+                        intArrayOf(Color.argb(70, 0, 0, 0), Color.argb(150, 0, 0, 0)),
+                    ),
+                ),
+            )
         } else {
-            r.background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = pillH / 2f
-                setColor(Color.BLACK)
-            }
-            r.outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, pillH / 2f)
+            val mid = Color.rgb(
+                (Color.red(gradStart) + Color.red(gradEnd)) / 2,
+                (Color.green(gradStart) + Color.green(gradEnd)) / 2,
+                (Color.blue(gradStart) + Color.blue(gradEnd)) / 2,
+            )
+            GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(gradStart, mid, gradEnd),
+            )
+        }
+    }
+
+    /**
+     * A genuinely blurred copy of the artwork. Heavily downscaled (which already hides detail
+     * when stretched back up) and then box-blurred in both directions, three times, which
+     * converges on a Gaussian. The previous routine was a horizontal-only pass divided by the
+     * wrong amount, so it produced a near-black smear instead of a blur.
+     */
+    private fun buildBlurred(src: Bitmap): Bitmap {
+        val tw = 64
+        val th = 36
+        val out = Bitmap.createBitmap(tw, th, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        val scale = max(tw / src.width.toFloat(), th / src.height.toFloat())
+        val dw = src.width * scale
+        val dh = src.height * scale
+        canvas.drawBitmap(
+            src, null,
+            RectF((tw - dw) / 2f, (th - dh) / 2f, (tw + dw) / 2f, (th + dh) / 2f),
+            Paint(Paint.FILTER_BITMAP_FLAG),
+        )
+        var a = IntArray(tw * th)
+        var b = IntArray(tw * th)
+        out.getPixels(a, 0, tw, 0, 0, tw, th)
+        repeat(3) {
+            boxBlurPass(a, b, tw, th, 4, horizontal = true)
+            boxBlurPass(b, a, tw, th, 4, horizontal = false)
+        }
+        out.setPixels(a, 0, tw, 0, 0, tw, th)
+        return out
+    }
+
+    private fun boxBlurPass(src: IntArray, dst: IntArray, w: Int, h: Int, radius: Int, horizontal: Boolean) {
+        val len = if (horizontal) w else h
+        val lines = if (horizontal) h else w
+        val div = (radius * 2 + 1).toFloat()
+        for (line in 0 until lines) {
+            for (i in 0 until len) {
+                var r = 0; var g = 0; var bl = 0
+                for (k in -radius..radius) {
+                    val j = (i + k).coerceIn(0, len - 1)
+                    val p = if (horizontal) src[line * w + j] else src[j * w + line]
+                    r += (p shr 16) and 0xff
+                    g += (p shr 8) and 0xff
+                    bl += p and 0xff
                 }
+                val px = (0xff shl 24) or ((r / div).toInt() shl 16) or ((g / div).toInt() shl 8) or (bl / div).toInt()
+                if (horizontal) dst[line * w + i] = px else dst[i * w + line] = px
             }
-            r.clipToOutline = true
         }
-    }
-
-    private fun createDarkBlurredBitmap(source: Bitmap): Bitmap {
-        return runCatching {
-            val width = 60
-            val height = (source.height.toFloat() / source.width.toFloat() * width).toInt().coerceAtLeast(1)
-            val small = Bitmap.createScaledBitmap(source, width, height, true)
-            blurBitmap(small, 12)
-        }.getOrDefault(source)
-    }
-
-    private fun blurBitmap(src: Bitmap, radius: Int): Bitmap {
-        val w = src.width
-        val h = src.height
-        val pix = IntArray(w * h)
-        src.getPixels(pix, 0, w, 0, 0, w, h)
-
-        val r = radius.coerceAtLeast(1)
-        val wm = w - 1
-        val hm = h - 1
-        val div = r + r + 1
-
-        val divsum = ((div + 1) shr 1) * ((div + 1) shr 1)
-        val dv = IntArray(256 * divsum) { it / divsum }
-
-        var yw = 0
-        var yi = 0
-        val vmin = IntArray(Math.max(w, h))
-
-        for (y in 0 until h) {
-            var rsum = 0
-            var gsum = 0
-            var bsum = 0
-            for (i in -r..r) {
-                val p = pix[yi + Math.min(wm, Math.max(i, 0))]
-                rsum += (p shr 16) and 0xff
-                gsum += (p shr 8) and 0xff
-                bsum += p and 0xff
-            }
-            for (x in 0 until w) {
-                pix[yi] = (pix[yi] and 0xff000000.toInt()) or (dv[rsum] shl 16) or (dv[gsum] shl 8) or dv[bsum]
-                if (y == 0) vmin[x] = Math.min(x + r + 1, wm)
-                val p1 = pix[yw + vmin[x]]
-                val p2 = pix[yw + Math.max(x - r, 0)]
-                rsum += ((p1 shr 16) and 0xff) - ((p2 shr 16) and 0xff)
-                gsum += ((p1 shr 8) and 0xff) - ((p2 shr 8) and 0xff)
-                bsum += (p1 and 0xff) - (p2 and 0xff)
-                yi++
-            }
-            yw += w
-        }
-        val blurred = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        blurred.setPixels(pix, 0, w, 0, 0, w, h)
-        return blurred
     }
 
     private fun applyArt() {
@@ -611,10 +746,44 @@ class DynamicIslandView(private val context: Context) {
 
     // ------------------------------------------------------------------ touch --
 
+    private var downX = 0f
+    private var downY = 0f
+    private var moved = false
+
+    /**
+     * The whole island is one touch target. The listener lives on the root and children of the
+     * collapsed pill are not clickable, so a tap ANYWHERE on the pill (art, waveform, the dead
+     * space over the camera) opens the card. Buttons on the open card still get their own taps.
+     */
     private fun handleTouch(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
-            if (isExpanded) setExpanded(false)
-            return true
+        when (event.actionMasked) {
+            MotionEvent.ACTION_OUTSIDE -> {
+                if (isExpanded) setExpanded(false)
+                return true
+            }
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.rawX
+                downY = event.rawY
+                moved = false
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dx = event.rawX - downX
+                val dy = event.rawY - downY
+                if (dx * dx + dy * dy > dp(10) * dp(10)) moved = true
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                val dy = event.rawY - downY
+                if (dy < -dp(18)) {
+                    if (isExpanded) setExpanded(false) else onDismissedBySwipe?.invoke()
+                } else if (!moved && !isExpanded) {
+                    root?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    setExpanded(true)
+                }
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> return true
         }
         return false
     }
@@ -622,28 +791,61 @@ class DynamicIslandView(private val context: Context) {
     private fun setExpanded(expand: Boolean) {
         val r = root ?: return
         val lp = params ?: return
+        val collapsed = collapsedView ?: return
+        val expanded = expandedView ?: return
+        val bg = bgView ?: return
         if (isExpanded == expand) return
         isExpanded = expand
 
-        collapsedView?.visibility = if (expand) View.GONE else View.VISIBLE
-        expandedView?.visibility = if (expand) View.VISIBLE else View.GONE
-        applyBackground()
-
         val screenW = context.resources.displayMetrics.widthPixels
         val cardW = minOf(screenW - dp(24), dp(420))
-        lp.width = if (expand) cardW else pillW
-        lp.height = if (expand) WindowManager.LayoutParams.WRAP_CONTENT else pillH
-        lp.x = if (expand) 0 else pillX
-        lp.y = pillTop
-        runCatching { windowManager.updateViewLayout(r, lp) }
+        bodyAnim?.cancel()
+        collapsed.animate().cancel()
+        expanded.animate().cancel()
+        bg.animate().cancel()
 
-        r.pivotY = 0f
-        r.pivotX = (if (expand) cardW else pillW) / 2f
-        r.scaleX = if (expand) 0.55f else 1.12f
-        r.scaleY = if (expand) 0.55f else 1.12f
-        r.alpha = 0.6f
-        r.animate().alpha(1f).scaleX(1f).scaleY(1f)
-            .setDuration(240).setInterpolator(DecelerateInterpolator(1.4f)).start()
+        if (expand) {
+            expanded.visibility = View.VISIBLE
+            expanded.measure(
+                View.MeasureSpec.makeMeasureSpec(cardW, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+            )
+            val cardH = expanded.measuredHeight
+
+            lp.width = cardW
+            lp.height = cardH
+            lp.x = 0
+            lp.y = pillTop
+            runCatching { windowManager.updateViewLayout(r, lp) }
+
+            bg.animate().alpha(1f).setStartDelay(0).setDuration(260).start()
+            collapsed.animate().alpha(0f).setStartDelay(0).setDuration(110).start()
+            expanded.animate().alpha(1f).setStartDelay(130).setDuration(240).start()
+            bodyAnim = runBodyAnimation(
+                body, r, cardW.toFloat(), cardH.toFloat(), 0f,
+                durationMs = 460,
+                widthInterpolator = SpringInterpolator(),
+                heightInterpolator = SpringInterpolator(damping = 9f, frequency = 1.2f),
+            )
+        } else {
+            expanded.animate().alpha(0f).setStartDelay(0).setDuration(110).start()
+            bg.animate().alpha(0f).setStartDelay(100).setDuration(260).start()
+            collapsed.animate().alpha(1f).setStartDelay(190).setDuration(200).start()
+            bodyAnim = runBodyAnimation(
+                body, r, pillW.toFloat(), pillH.toFloat(), 0f,
+                durationMs = 360,
+                widthInterpolator = DecelerateInterpolator(1.5f),
+                heightInterpolator = DecelerateInterpolator(1.5f),
+                onEnd = {
+                    if (root === r && !isExpanded) {
+                        expanded.visibility = View.GONE
+                        lp.width = pillW
+                        lp.height = pillH
+                        runCatching { windowManager.updateViewLayout(r, lp) }
+                    }
+                },
+            )
+        }
 
         onExpandedChanged?.invoke(expand)
     }

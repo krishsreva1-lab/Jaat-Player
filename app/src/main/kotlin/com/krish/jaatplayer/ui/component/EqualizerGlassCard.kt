@@ -77,11 +77,6 @@ fun EqualizerGlassCard(
     val dolbyRichPreset = floatArrayOf(100f, 160f, 200f, 220f, 280f, 260f, 240f, 200f, 150f, 50f)
     val dolbyFocusedPreset = floatArrayOf(-300f, -50f, 130f, 180f, 220f, 120f, 140f, 100f, -50f, -300f)
 
-    // Dirac Audio Presets
-    val diracMusicPreset = floatArrayOf(200f, 140f, 80f, 0f, 30f, 80f, 140f, 200f, 280f, 350f)
-    val diracMoviePreset = floatArrayOf(300f, 250f, 150f, 0f, 70f, 120f, 180f, 250f, 320f, 400f)
-    val diracGamePreset = floatArrayOf(150f, 250f, 200f, 0f, 80f, 150f, 300f, 450f, 400f, 280f)
-
     // Jaat Signature active states & label
     val isJaatSig = enabled && bandGains.contentEquals(jaatSignaturePreset)
     val isJaatBass = enabled && bandGains.contentEquals(jaatBassBoostPreset)
@@ -106,18 +101,6 @@ fun EqualizerGlassCard(
         isDolbyRich -> "Dolby (Rich)"
         isDolbyFocused -> "Dolby (Focused)"
         else -> "Dolby Atmos"
-    }
-
-    // Dirac Audio active states & label
-    val isDiracMusic = enabled && bandGains.contentEquals(diracMusicPreset)
-    val isDiracMovie = enabled && bandGains.contentEquals(diracMoviePreset)
-    val isDiracGame = enabled && bandGains.contentEquals(diracGamePreset)
-    val isDiracActive = isDiracMusic || isDiracMovie || isDiracGame
-    val diracLabel = when {
-        isDiracMusic -> "Dirac (Music)"
-        isDiracMovie -> "Dirac (Movie)"
-        isDiracGame -> "Dirac (Game)"
-        else -> "Dirac Audio"
     }
 
     // 3D Reverb active state & label
@@ -280,57 +263,27 @@ fun EqualizerGlassCard(
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
+                // 3D Reverb button with mode cycling
+                ToggleButton(
+                    checked = is3DReverbActive,
+                    onCheckedChange = {
+                        if (!enabled) viewModel.setEnabled(true)
+                        val nextPreset = when (reverbPreset) {
+                            Reverb3DPreset.NONE -> Reverb3DPreset.NORMAL
+                            Reverb3DPreset.NORMAL -> Reverb3DPreset.CONCERT
+                            Reverb3DPreset.CONCERT -> Reverb3DPreset.TECHNO
+                            Reverb3DPreset.TECHNO -> Reverb3DPreset.NONE
+                        }
+                        viewModel.setReverbPreset(nextPreset)
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Dirac Audio button with mode cycling
-                    ToggleButton(
-                        checked = isDiracActive,
-                        onCheckedChange = {
-                            if (!enabled) viewModel.setEnabled(true)
-                            when {
-                                isDiracMusic -> viewModel.setBandsGains(diracMoviePreset, fromUser = true)
-                                isDiracMovie -> viewModel.setBandsGains(diracGamePreset, fromUser = true)
-                                isDiracGame -> viewModel.reset()
-                                else -> viewModel.setBandsGains(diracMusicPreset, fromUser = true)
-                            }
-                        },
-                        shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        AnimatedContent(
-                            targetState = diracLabel,
-                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) },
-                            label = "diracLabelAnim"
-                        ) { label ->
-                            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                        }
-                    }
-
-                    // 3D Reverb button with mode cycling
-                    ToggleButton(
-                        checked = is3DReverbActive,
-                        onCheckedChange = {
-                            if (!enabled) viewModel.setEnabled(true)
-                            val nextPreset = when (reverbPreset) {
-                                Reverb3DPreset.NONE -> Reverb3DPreset.NORMAL
-                                Reverb3DPreset.NORMAL -> Reverb3DPreset.CONCERT
-                                Reverb3DPreset.CONCERT -> Reverb3DPreset.TECHNO
-                                Reverb3DPreset.TECHNO -> Reverb3DPreset.NONE
-                            }
-                            viewModel.setReverbPreset(nextPreset)
-                        },
-                        shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        AnimatedContent(
-                            targetState = reverbLabel,
-                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) },
-                            label = "reverbLabelAnim"
-                        ) { label ->
-                            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                        }
+                    AnimatedContent(
+                        targetState = reverbLabel,
+                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) },
+                        label = "reverbLabelAnim"
+                    ) { label ->
+                        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
                 }
 

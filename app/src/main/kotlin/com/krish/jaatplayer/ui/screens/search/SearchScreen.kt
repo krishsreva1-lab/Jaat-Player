@@ -479,44 +479,51 @@ fun SearchScreen(
                     }
 
                 }
-
-                AnimatedVisibility(
-                    visible = !searchActive,
-                    enter = expandVertically(animationSpec = tween(durationMillis = 245, easing = FastOutSlowInEasing)) + fadeIn(),
-                    exit = shrinkVertically(animationSpec = tween(durationMillis = 245, easing = FastOutSlowInEasing)) + fadeOut()
-                ) {
-                    Column {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        CompositionLocalProvider(LocalAppBackdrop provides searchBackdrop) {
-                            SearchGlassDock(
-                                selectedTabIndex = selectedTabIndex,
-                                onTabSelected = { selectedTabIndex = it },
-                                pureBlack = pureBlack
-                            )
-                        }
-                    }
-                }
             }
         },
         containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.background
     ) { paddingValues ->
         val bottomPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
-        
+
         Box(
-            modifier = Modifier
-                .padding(top = if (searchFieldGlass) 0.dp else paddingValues.calculateTopPadding())
-                .fillMaxSize()
-                .layerBackdrop(searchBackdrop)
+            modifier = Modifier.fillMaxSize()
         ) {
-            if (!searchActive) {
-                val tabPadding = PaddingValues(
-                    top = if (searchFieldGlass) paddingValues.calculateTopPadding() else 0.dp,
-                    bottom = bottomPadding
-                )
-                when (selectedTabIndex) {
-                    0 -> ExploreTabContent(navController = navController, contentPadding = tabPadding)
-                    1 -> SuggestionsTabContent(navController = navController, contentPadding = tabPadding)
-                    2 -> AlbumsTabContent(navController = navController, contentPadding = tabPadding)
+            Box(
+                modifier = Modifier
+                    .padding(top = if (searchFieldGlass) 0.dp else paddingValues.calculateTopPadding())
+                    .fillMaxSize()
+                    .layerBackdrop(searchBackdrop)
+            ) {
+                if (!searchActive) {
+                    val tabPadding = PaddingValues(
+                        top = if (searchFieldGlass) paddingValues.calculateTopPadding() + 56.dp else 56.dp,
+                        bottom = bottomPadding
+                    )
+                    when (selectedTabIndex) {
+                        0 -> ExploreTabContent(navController = navController, contentPadding = tabPadding)
+                        1 -> SuggestionsTabContent(navController = navController, contentPadding = tabPadding)
+                        2 -> AlbumsTabContent(navController = navController, contentPadding = tabPadding)
+                    }
+                }
+            }
+
+            AnimatedVisibility(
+                visible = !searchActive,
+                enter = expandVertically(animationSpec = tween(durationMillis = 245, easing = FastOutSlowInEasing)) + fadeIn(),
+                exit = shrinkVertically(animationSpec = tween(durationMillis = 245, easing = FastOutSlowInEasing)) + fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = paddingValues.calculateTopPadding())
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    CompositionLocalProvider(LocalAppBackdrop provides searchBackdrop) {
+                        SearchGlassDock(
+                            selectedTabIndex = selectedTabIndex,
+                            onTabSelected = { selectedTabIndex = it },
+                            pureBlack = pureBlack
+                        )
+                    }
                 }
             }
         }
@@ -752,38 +759,12 @@ private fun SearchGlassDock(
         label = "animatedIndex"
     )
 
-    DisposableEffect(searchGyroPuckEnabled, selectedTabIndex, tabsCount) {
-        if (!searchGyroPuckEnabled) return@DisposableEffect onDispose {}
-
-        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-        val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
-            ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
-        if (sensorManager == null || sensor == null) return@DisposableEffect onDispose {}
-
-        var lastTargetIndex = selectedTabIndex
-        val listener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent?) {
-                event ?: return
-                val xTilt = -event.values[0]
-                if (kotlin.math.abs(xTilt) > 3.8f) {
-                    val targetIndex = if (xTilt > 0) (selectedTabIndex + 1).coerceAtMost(tabsCount - 1) else (selectedTabIndex - 1).coerceAtLeast(0)
-                    if (targetIndex != lastTargetIndex) {
-                        lastTargetIndex = targetIndex
-                        onTabSelected(targetIndex)
-                    }
-                }
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }
-
-        sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
-
-        onDispose {
-            sensorManager.unregisterListener(listener)
-        }
-    }
+    com.krish.jaatplayer.ui.component.TiltTabStepper(
+        enabled = searchGyroPuckEnabled,
+        currentIndex = { selectedTabIndex },
+        tabsCount = tabsCount,
+        onStep = onTabSelected,
+    )
 
     if (searchDockPuckStyle) {
         // Water-drop puck style (same puck as the home navigation bar).

@@ -409,6 +409,9 @@
     <string name="export_desc">Export as MP3</string>
     <string name="export_directory_not_set">Set an export folder in Storage settings first</string>
     <string name="export_directory">Export folder</string>
+    <string name="export_downloaded_songs">Export downloaded songs</string>
+    <string name="export_downloaded_songs_desc">Export all downloaded songs to MP3 in the export folder</string>
+    <string name="no_downloaded_songs">No downloaded songs found</string>
     <string name="export_music">Export music</string>
     <string name="exporting">Exporting</string>
     <string name="action_exported">Exported</string>
@@ -540,14 +543,10 @@
     <string name="eq_preset_dolby_open">Dolby Open</string>
     <string name="eq_preset_dolby_rich">Dolby Rich</string>
     <string name="eq_preset_dolby_focused">Dolby Focused</string>
-    <string name="eq_preset_dirac_music">Dirac Music</string>
-    <string name="eq_preset_dirac_movie">Dirac Movie</string>
-    <string name="eq_preset_dirac_game">Dirac Game</string>
-    <string name="eq_enable_title">Equalizer</string>
-    <string name="eq_enable_summary">Toggle professional audio processing</string>
     <string name="eq_label_jaat">Jaat Signature</string>
     <string name="eq_label_dolby">Dolby Atmos</string>
-    <string name="eq_label_dirac">Dirac Audio</string>
+    <string name="eq_enable_title">Equalizer</string>
+    <string name="eq_enable_summary">Toggle professional audio processing</string>
     <string name="eq_reset">Reset</string>
     <string name="eq_label_custom">Custom</string>
     <string name="eq_save">Save</string>

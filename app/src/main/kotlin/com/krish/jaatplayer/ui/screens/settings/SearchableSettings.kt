@@ -142,6 +142,7 @@ fun getAllSearchableSettings(): List<Triple<String, String, String>> {
             Triple(stringResource(R.string.enable_swipe_thumbnail), "Appearance", "settings/appearance"),
             Triple(stringResource(R.string.export_desc), "Player and audio", "settings/player"),
             Triple(stringResource(R.string.export_directory), "Storage", "settings/storage"),
+            Triple(stringResource(R.string.export_downloaded_songs), "Storage", "settings/storage"),
             Triple(stringResource(R.string.fade), "Appearance", "settings/appearance"),
             Triple(stringResource(R.string.filter_library), "Appearance", "settings/appearance"),
             Triple(stringResource(R.string.filter_local), "Appearance", "settings/appearance"),

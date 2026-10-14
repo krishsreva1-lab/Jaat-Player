@@ -1232,42 +1232,14 @@ private fun SharedTransitionScope.ExpandedTabs(
         defaultValue = false
     )
 
-    DisposableEffect(searchGyroPuckEnabled, currentIndex, tabsCount) {
-        if (!searchGyroPuckEnabled) return@DisposableEffect onDispose {}
-
-        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-        val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GRAVITY)
-            ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
-        if (sensorManager == null || sensor == null) return@DisposableEffect onDispose {}
-
-        var lastTargetIndex = currentIndex
-        val listener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent?) {
-                event ?: return
-                val xTilt = -event.values[0]
-                if (kotlin.math.abs(xTilt) > 3.8f) {
-                    val targetIndex = if (xTilt > 0) {
-                        (currentIndex + 1).coerceAtMost(tabsCount - 1)
-                    } else {
-                        (currentIndex - 1).coerceAtLeast(0)
-                    }
-                    if (targetIndex != lastTargetIndex && targetIndex != currentIndex) {
-                        lastTargetIndex = targetIndex
-                        currentTabs.value.getOrNull(targetIndex)?.onClick?.invoke()
-                    }
-                }
-            }
-
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }
-
-        sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
-
-        onDispose {
-            sensorManager.unregisterListener(listener)
-        }
-    }
+    // Tilt-to-switch: smoothed, one tab per tilt. Stays still while the Search screen owns the tilt.
+    com.krish.jaatplayer.ui.component.TiltTabStepper(
+        enabled = searchGyroPuckEnabled,
+        currentIndex = { currentIndex },
+        tabsCount = tabsCount,
+        blocked = { com.krish.jaatplayer.ui.component.NavTiltGate.blockedBySearch },
+        onStep = { target -> currentTabs.value.getOrNull(target)?.onClick?.invoke() },
+    )
 
     // Keeps the puck synced when selection changes from a tap (or external
     // navigation) rather than a drag on this bar.

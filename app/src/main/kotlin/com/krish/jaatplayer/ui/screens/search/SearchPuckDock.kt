@@ -120,7 +120,9 @@ fun SearchPuckDock(
     } else {
         Color(28, 27, 28)
     }
-    val puckRestAlpha = glassConfig.puckOpacity.coerceIn(0f, 1f)
+    // A resting wash of 0.8 hides almost everything behind the puck; on this dock keep it see-through
+    // so the page really shows through the glass (a lower user setting still wins).
+    val puckRestAlpha = glassConfig.puckOpacity.coerceIn(0f, 1f).coerceAtMost(0.3f)
 
     BoxWithConstraints(
         modifier = modifier
