@@ -1049,7 +1049,18 @@ class MainActivity : ComponentActivity() {
                                                 ),
                                             )
                                         },
-                                        actions = {},
+                                        actions = {
+                                            TopHeaderGlassDock(
+                                                showHistoryButton = showHistoryButton,
+                                                listenTogetherInTopBar = listenTogetherInTopBar,
+                                                accountImageUrl = accountImageUrl,
+                                                pureBlack = pureBlack,
+                                                onHistoryClick = { navController.navigate("history") },
+                                                onStatsClick = { navController.navigate("stats") },
+                                                onListenTogetherClick = { navController.navigate("listen_together_from_topbar") },
+                                                onSettingsClick = { showSettingDialoge = true },
+                                            )
+                                        },
                                         scrollBehavior = topAppBarScrollBehavior,
                                         colors = TopAppBarDefaults.topAppBarColors(
                                             containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,

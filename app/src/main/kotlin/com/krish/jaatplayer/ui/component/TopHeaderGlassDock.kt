@@ -137,40 +137,46 @@ fun TopHeaderGlassDock(
     val tabWidthPx = with(density) { itemWidth.toPx() }
     val paddingPx = with(density) { barPadding.toPx() }
     val totalWidth = itemWidth * count + barPadding * 2
-    val totalWidthPx = tabWidthPx * count + paddingPx * 2
+    val totalWidthPx = with(density) { totalWidth.toPx() }
 
     val offsetAnimation = remember(count) { Animatable(0f) }
     val panelOffset by remember(density, totalWidthPx) {
         derivedStateOf {
-            val fraction = (offsetAnimation.value / totalWidthPx).fastCoerceIn(-1f, 1f)
+            if (totalWidthPx <= 0f) return@derivedStateOf 0f
+            val rawFraction = offsetAnimation.value / totalWidthPx
+            if (rawFraction.isNaN()) return@derivedStateOf 0f
+            val fraction = rawFraction.fastCoerceIn(-1f, 1f)
             with(density) { 3f.dp.toPx() * fraction.sign * EaseOut.transform(abs(fraction)) }
         }
     }
 
-    var selectedIndex by remember(count) { mutableIntStateOf(count - 1) }
+    var selectedIndex by remember(count) { mutableIntStateOf((count - 1).coerceAtLeast(0)) }
+    val safeSelectedIndex = selectedIndex.coerceIn(0, (count - 1).coerceAtLeast(0))
 
     val dampedDragAnimation = remember(animationScope, count, tabWidthPx) {
         DampedDragAnimation(
             animationScope = animationScope,
-            initialValue = selectedIndex.toFloat(),
-            valueRange = 0f..(count - 1).toFloat(),
+            initialValue = safeSelectedIndex.toFloat(),
+            valueRange = 0f..(count - 1).coerceAtLeast(0).toFloat(),
             visibilityThreshold = 0.001f,
             initialScale = 1f,
             pressedScale = 1.25f,
             onDragStarted = {},
             onDragStopped = {
-                val targetIndex = targetValue.fastRoundToInt().coerceIn(0, count - 1)
+                val targetIndex = targetValue.fastRoundToInt().coerceIn(0, (count - 1).coerceAtLeast(0))
                 selectedIndex = targetIndex
                 updateValue(targetIndex.toFloat())
                 animationScope.launch { offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f)) }
                 items.getOrNull(targetIndex)?.onClick?.invoke()
             },
             onDrag = { _, dragAmount ->
-                updateValue(
-                    (targetValue + dragAmount.x / tabWidthPx * if (isLtr) 1f else -1f)
-                        .fastCoerceIn(0f, (count - 1).toFloat())
-                )
-                animationScope.launch { offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x) }
+                if (tabWidthPx > 0f) {
+                    updateValue(
+                        (targetValue + dragAmount.x / tabWidthPx * if (isLtr) 1f else -1f)
+                            .fastCoerceIn(0f, (count - 1).coerceAtLeast(0).toFloat())
+                    )
+                    animationScope.launch { offsetAnimation.snapTo(offsetAnimation.value + dragAmount.x) }
+                }
             },
             velocityDampingRatio = 1f,
         )
@@ -256,11 +262,11 @@ fun TopHeaderGlassDock(
                 val item = items[index]
                 ItemIconContent(
                     index = index,
-                    scale = if (index == selectedIndex) lerp(1f, 1.1f, dampedDragAnimation.pressProgress) else 1f,
+                    scale = if (index == safeSelectedIndex) lerp(1f, 1.1f, dampedDragAnimation.pressProgress) else 1f,
                     modifier = Modifier
                         .width(itemWidth)
                         .fillMaxHeight()
-                        .alpha(if (index == selectedIndex) 1f else 0.7f)
+                        .alpha(if (index == safeSelectedIndex) 1f else 0.7f)
                         .clip(puckShape)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
@@ -309,7 +315,7 @@ fun TopHeaderGlassDock(
                 for (index in 0 until count) {
                     ItemIconContent(
                         index = index,
-                        scale = if (index == selectedIndex) lerp(1f, 1.1f, dampedDragAnimation.pressProgress) else 1f,
+                        scale = if (index == safeSelectedIndex) lerp(1f, 1.1f, dampedDragAnimation.pressProgress) else 1f,
                         modifier = Modifier.width(itemWidth).fillMaxHeight()
                     )
                 }
@@ -386,7 +392,7 @@ fun TopHeaderGlassDock(
 
         // Selected icon drawn on top of the puck
         val puckIndex by remember(count) {
-            derivedStateOf { dampedDragAnimation.value.fastRoundToInt().coerceIn(0, count - 1) }
+            derivedStateOf { dampedDragAnimation.value.fastRoundToInt().coerceIn(0, (count - 1).coerceAtLeast(0)) }
         }
         Box(
             Modifier
