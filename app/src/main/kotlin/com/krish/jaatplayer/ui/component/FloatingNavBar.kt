@@ -54,7 +54,9 @@ fun AppFloatingNavBar(
     onAccessoryClick: () -> Unit = {},
 ) {
     // While the Search screen is open, tilt belongs to the Search dock puck, not this bar's puck.
-    val searchOpen = currentRoute?.startsWith("search/") == true
+    // The Search route is exactly "search" (results use "search/..."); the old check only matched
+    // "search/", so the gate never closed and both pucks followed the tilt.
+    val searchOpen = currentRoute == Screens.Search.route || currentRoute?.startsWith("search/") == true
     androidx.compose.runtime.SideEffect { NavTiltGate.blockedBySearch = searchOpen }
 
     val glassConfig = LocalGlassEffectConfig.current

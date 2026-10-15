@@ -1178,9 +1178,11 @@ private fun SharedTransitionScope.ExpandedTabs(
                 animationScope.launch {
                     offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f))
                 }
-                if (hasDraggedPuck) {
-                    currentTabs.value.getOrNull(targetIndex)?.onClick?.invoke()
-                }
+                // A real drag navigates to where the puck was dropped. A plain TAP on the puck
+                // must navigate too: the puck sits on top of its tab and takes the touch, so
+                // the tab's own click never sees it. That is why tapping Home from Search (the
+                // puck is still parked on Home) did nothing until you visited Library first.
+                currentTabs.value.getOrNull(targetIndex)?.onClick?.invoke()
             },
             onDrag = { _, dragAmount ->
                 if (dragAmount != Offset.Zero) hasDraggedPuck = true

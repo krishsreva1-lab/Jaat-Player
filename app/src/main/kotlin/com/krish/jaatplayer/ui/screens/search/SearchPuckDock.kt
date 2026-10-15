@@ -110,8 +110,13 @@ fun SearchPuckDock(
     val barPadding = 4.dp
     val tabHeight = 52.dp
 
-    val contentColor = if (useGlass) glassConfig.textColor else MaterialTheme.colorScheme.onSurface
-    val accentColor = if (useGlass) glassConfig.textColor else MaterialTheme.colorScheme.primary
+    // glassConfig.textColor is Color.Unspecified by default. Tinting the hidden icon copy
+    // (the one the puck refracts) with Unspecified made it vanish, so the puck showed no icon
+    // behind it. The bottom nav bar resolves it to black/white by theme; do the same here.
+    val adaptiveText = if (glassConfig.textColor.isSpecified) glassConfig.textColor
+    else if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) Color.Black else Color.White
+    val contentColor = if (useGlass) adaptiveText else MaterialTheme.colorScheme.onSurface
+    val accentColor = if (useGlass) adaptiveText else MaterialTheme.colorScheme.primary
 
     val puckWash = if (glassConfig.puckColor.isSpecified) {
         glassConfig.puckColor
@@ -255,7 +260,7 @@ fun SearchPuckDock(
                     )
                     .border(
                         width = 1.dp,
-                        color = if (useGlass) glassConfig.textColor.copy(alpha = 0.25f)
+                        color = if (useGlass) adaptiveText.copy(alpha = 0.25f)
                         else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
                         shape = dockShape
                     )

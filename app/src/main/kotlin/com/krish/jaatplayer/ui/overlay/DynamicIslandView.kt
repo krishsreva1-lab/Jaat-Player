@@ -27,6 +27,7 @@ import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
@@ -110,6 +111,12 @@ class DynamicIslandView(private val context: Context) {
     private var pillX = 0          // horizontal offset so the pill sits exactly on the camera hole
     private var cardTopPad = 0     // expanded card top padding (content starts below the camera)
     private var cameraD = 0        // diameter of the dot the island grows out of / shrinks into
+    // Transparent margin around the collapsed pill: a bigger touch target (taps just off the
+    // edge still count) and room for the spring overshoot so it is never clipped flat.
+    private var padX = 0
+    private var padY = 0
+    private val collapsedWindowW: Int get() = pillW + 2 * padX
+    private val collapsedWindowH: Int get() = pillH + padY
 
     val isShowing: Boolean get() = root != null
 
@@ -321,6 +328,8 @@ class DynamicIslandView(private val context: Context) {
         pillH = (screenW * 0.0897f).toInt()
         pillTop = (screenW * 0.0155f).toInt()
         pillX = 0
+        padX = dp(10)
+        padY = dp(8)
 
         // The dot it grows out of: the size of the camera hole, never bigger than the pill.
         cameraD = max(dp(10), min(min(cutW, cutH).coerceAtLeast(dp(10)), (pillH * 0.8f).toInt()))
@@ -358,8 +367,8 @@ class DynamicIslandView(private val context: Context) {
             }
 
         val lp = WindowManager.LayoutParams(
-            pillW,
-            pillH,
+            collapsedWindowW,
+            collapsedWindowH,
             overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -371,6 +380,9 @@ class DynamicIslandView(private val context: Context) {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             x = pillX
             y = pillTop
+            // Many ROMs fade / zoom / slide a freshly added or resized overlay window on their
+            // own. That ran on top of this view's animation and read as a glitch.
+            windowAnimations = R.style.DynamicIslandNoWindowAnimation
             // Without this the system refuses to draw an overlay over the camera cut-out.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -748,14 +760,24 @@ class DynamicIslandView(private val context: Context) {
 
     private var downX = 0f
     private var downY = 0f
+    private var downTime = 0L
     private var moved = false
+    private var gestureDone = false
 
     /**
-     * The whole island is one touch target. The listener lives on the root and children of the
-     * collapsed pill are not clickable, so a tap ANYWHERE on the pill (art, waveform, the dead
-     * space over the camera) opens the card. Buttons on the open card still get their own taps.
+     * The whole island is one touch target. The listener lives on the root and the collapsed
+     * pill's children are not clickable, so a tap ANYWHERE on the pill (art, waveform, the dead
+     * space over the camera, the transparent margin) opens the card.
+     *
+     * Why taps used to be missed: the island sits in the status-bar strip, where the system's
+     * pull-down-shade gesture also listens. A normal finger tap drifts a hair downward, the
+     * system claims the touch, and this window receives ACTION_CANCEL instead of ACTION_UP,
+     * so nothing happened unless the tap landed perfectly still. The old code also treated any
+     * 8dp wobble as "not a tap". A short press that is cancelled by the system is now treated
+     * as the tap it was, and the movement tolerance follows the system touch slop.
      */
     private fun handleTouch(event: MotionEvent): Boolean {
+        val slop = ViewConfiguration.get(context).scaledTouchSlop * 2
         when (event.actionMasked) {
             MotionEvent.ACTION_OUTSIDE -> {
                 if (isExpanded) setExpanded(false)
@@ -764,28 +786,42 @@ class DynamicIslandView(private val context: Context) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.rawX
                 downY = event.rawY
+                downTime = event.eventTime
                 moved = false
+                gestureDone = false
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
+                if (gestureDone) return true
                 val dx = event.rawX - downX
                 val dy = event.rawY - downY
-                if (dx * dx + dy * dy > dp(10) * dp(10)) moved = true
-                return true
-            }
-            MotionEvent.ACTION_UP -> {
-                val dy = event.rawY - downY
-                if (dy < -dp(18)) {
+                if (dx * dx + dy * dy > slop * slop) moved = true
+                // Swipe up acts as soon as it is clearly a swipe (the system may take the
+                // touch away a moment later).
+                if (dy < -dp(24)) {
+                    gestureDone = true
                     if (isExpanded) setExpanded(false) else onDismissedBySwipe?.invoke()
-                } else if (!moved && !isExpanded) {
-                    root?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                    setExpanded(true)
                 }
                 return true
             }
-            MotionEvent.ACTION_CANCEL -> return true
+            MotionEvent.ACTION_UP -> {
+                if (!gestureDone && !moved && !isExpanded) openFromTap()
+                gestureDone = true
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                val shortPress = event.eventTime - downTime < 400L
+                if (!gestureDone && !moved && shortPress && !isExpanded) openFromTap()
+                gestureDone = true
+                return true
+            }
         }
         return false
+    }
+
+    private fun openFromTap() {
+        root?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        setExpanded(true)
     }
 
     private fun setExpanded(expand: Boolean) {
@@ -816,31 +852,53 @@ class DynamicIslandView(private val context: Context) {
             lp.height = cardH
             lp.x = 0
             lp.y = pillTop
-            runCatching { windowManager.updateViewLayout(r, lp) }
 
-            bg.animate().alpha(1f).setStartDelay(0).setDuration(260).start()
-            collapsed.animate().alpha(0f).setStartDelay(0).setDuration(110).start()
-            expanded.animate().alpha(1f).setStartDelay(130).setDuration(240).start()
-            bodyAnim = runBodyAnimation(
-                body, r, cardW.toFloat(), cardH.toFloat(), 0f,
-                durationMs = 460,
-                widthInterpolator = SpringInterpolator(),
-                heightInterpolator = SpringInterpolator(damping = 9f, frequency = 1.2f),
-            )
+            // The window resize is asynchronous. Starting the animation straight away ran its
+            // first frames inside the OLD, pill-sized window (clipped, jumping), which was the
+            // visible glitch. Wait until the window has actually been laid out at card size.
+            var started = false
+            val start = {
+                if (!started && root === r && isExpanded) {
+                    started = true
+                    bg.animate().alpha(1f).setStartDelay(0).setDuration(260).start()
+                    collapsed.animate().alpha(0f).setStartDelay(0).setDuration(110).start()
+                    expanded.animate().alpha(1f).setStartDelay(120).setDuration(240).start()
+                    bodyAnim = runBodyAnimation(
+                        body, r, cardW.toFloat(), cardH.toFloat(), 0f,
+                        durationMs = 420,
+                        widthInterpolator = DecelerateInterpolator(2.2f),
+                        heightInterpolator = DecelerateInterpolator(2.0f),
+                    )
+                }
+            }
+            r.addOnLayoutChangeListener(object : View.OnLayoutChangeListener {
+                override fun onLayoutChange(
+                    v: View, l: Int, t: Int, rr: Int, b: Int, ol: Int, ot: Int, orr: Int, ob: Int,
+                ) {
+                    if (rr - l >= cardW && b - t >= cardH) {
+                        v.removeOnLayoutChangeListener(this)
+                        start()
+                    }
+                }
+            })
+            r.postDelayed({ start() }, 160) // safety net if the layout callback never fires
+            runCatching { windowManager.updateViewLayout(r, lp) }.onFailure { start() }
         } else {
             expanded.animate().alpha(0f).setStartDelay(0).setDuration(110).start()
             bg.animate().alpha(0f).setStartDelay(100).setDuration(260).start()
             collapsed.animate().alpha(1f).setStartDelay(190).setDuration(200).start()
             bodyAnim = runBodyAnimation(
                 body, r, pillW.toFloat(), pillH.toFloat(), 0f,
-                durationMs = 360,
-                widthInterpolator = DecelerateInterpolator(1.5f),
-                heightInterpolator = DecelerateInterpolator(1.5f),
+                durationMs = 340,
+                widthInterpolator = DecelerateInterpolator(1.6f),
+                heightInterpolator = DecelerateInterpolator(1.6f),
                 onEnd = {
                     if (root === r && !isExpanded) {
+                        // Everything but the pill is invisible by now, so shrinking the
+                        // window back is not seen.
                         expanded.visibility = View.GONE
-                        lp.width = pillW
-                        lp.height = pillH
+                        lp.width = collapsedWindowW
+                        lp.height = collapsedWindowH
                         runCatching { windowManager.updateViewLayout(r, lp) }
                     }
                 },
