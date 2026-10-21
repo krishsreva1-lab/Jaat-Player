@@ -77,13 +77,26 @@ fun Material3SettingsGroup(
                     else -> RoundedCornerShape(6.dp)
                 }
 
+                // Glass settings: each option is its own frosted-glass card (blur + rim highlight, no lens,
+                // so a long list stays cheap to draw). Normal cards when glass settings are off.
+                val settingsGlass = LocalSettingsGlass.current
+                val glassConfig = LocalGlassEffectConfig.current
+                val cardGlassConfig = androidx.compose.runtime.remember(glassConfig) {
+                    glassConfig.copy(lensHeight = 0f, lensAmount = 0f)
+                }
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .animateContentSize(),
+                        .animateContentSize()
+                        .then(if (settingsGlass) Modifier.liquidGlass(config = cardGlassConfig, shape = shape) else Modifier),
                     shape = shape,
                     colors = CardDefaults.cardColors(
-                        containerColor = if (item.isHighlighted)
+                        containerColor = if (settingsGlass) {
+                            if (item.isHighlighted)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+                            else
+                                androidx.compose.ui.graphics.Color.Transparent
+                        } else if (item.isHighlighted)
                             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
                         else
                             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)

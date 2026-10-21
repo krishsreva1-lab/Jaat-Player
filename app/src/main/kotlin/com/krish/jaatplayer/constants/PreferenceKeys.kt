@@ -474,12 +474,21 @@ enum class PlayerBackgroundStyle {
     LIQUID_GLASS,
 }
 
+enum class AppBackgroundStyle {
+    DEFAULT,
+    GRADIENT,
+    BLUR,
+    GLOW_ANIMATED,
+    LIQUID_GLASS,
+}
+
 val TopSize = stringPreferencesKey("topSize")
 val HistoryDuration = floatPreferencesKey("historyDuration")
 
 val PlayerButtonsStyleKey = stringPreferencesKey("player_buttons_style")
 val PlayerBackgroundStyleKey = stringPreferencesKey("playerBackgroundStyle")
 val MiniPlayerBackgroundStyleKey = stringPreferencesKey("miniPlayerBackgroundStyle")
+val AppBackgroundStyleKey = stringPreferencesKey("appBackgroundStyle")
 val ShowLyricsKey = booleanPreferencesKey("showLyrics")
 val SwipeLyricsKey = booleanPreferencesKey("swipeLyrics")
 val EnableLyricsThumbnailPlayPauseKey = booleanPreferencesKey("enableLyricsThumbnailPlayPause")
@@ -551,6 +560,9 @@ val HomeBackgroundAnimateKey = booleanPreferencesKey("homeBackgroundAnimate")
 val HomeBackgroundQualityKey = floatPreferencesKey("homeBackgroundQuality")
 /** True when [HomeBackgroundPathKey] points at a video file instead of an image. */
 val HomeBackgroundIsVideoKey = booleanPreferencesKey("homeBackgroundIsVideo")
+
+/** Settings screens drawn as glass cards over a soft colour backdrop (needs Liquid Glass on). Off by default. */
+val SettingsGlassEnabledKey = booleanPreferencesKey("settingsGlassEnabled")
 val CanvasThumbnailAnimationKey = booleanPreferencesKey("canvasThumbnailAnimation")
 val SwipeSensitivityKey = floatPreferencesKey("swipeSensitivity")
 

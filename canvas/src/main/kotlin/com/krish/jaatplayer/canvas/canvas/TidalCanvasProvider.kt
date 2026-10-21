@@ -76,14 +76,30 @@ object TidalCanvasProvider {
         val key = cacheKey("search_song", song, artist, album ?: "")
         cache[key]?.takeIf { it.expiresAtMs > System.currentTimeMillis() }?.let { return it.value }
 
-        val query = if (!album.isNullOrBlank()) "$album $artist $song" else "$artist $song"
-
-        val result = searchOnTidal(
-            query = query,
+        var result = searchOnTidal(
+            query = "$artist $song",
             types = "TRACKS",
             songValidation = song,
             artistValidation = artist
         )
+        if (result == null && !album.isNullOrBlank()) {
+            result = searchOnTidal(
+                query = "$album $artist $song",
+                types = "TRACKS",
+                songValidation = song,
+                artistValidation = artist
+            )
+        }
+        if (result == null && !album.isNullOrBlank()) {
+            // Tidal video covers live on albums, so try the album itself
+            result = searchOnTidal(
+                query = "$album $artist",
+                types = "ALBUMS",
+                songValidation = null,
+                artistValidation = artist,
+                albumValidation = album
+            )
+        }
         if (result != null) {
             cache[key] = CacheEntry(result, System.currentTimeMillis() + CACHE_TTL_MS)
         }
@@ -176,7 +192,7 @@ object TidalCanvasProvider {
                 }
             }
         } catch (e: Exception) {
-            // Ignore & return null
+            println("TidalCanvas: search failed for '$query': ${e.message}")
         }
         return null
     }

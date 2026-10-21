@@ -3,7 +3,9 @@
 package com.krish.jaatplayer.ui.screens
 
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibility
@@ -349,8 +351,19 @@ private fun SpotifyLoginSheet(
                         val cookieManager = CookieManager.getInstance()
                         cookieManager.setAcceptCookie(true)
                         cookieManager.setAcceptThirdPartyCookies(this, true)
+                        // White background so the page is never an invisible black box
+                        setBackgroundColor(android.graphics.Color.WHITE)
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
+                        settings.javaScriptCanOpenWindowsAutomatically = true
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                        // Spotify's login can blank out for the default "; wv" WebView user agent,
+                        // so present a normal mobile Chrome user agent instead.
+                        settings.userAgentString =
+                            WebSettings.getDefaultUserAgent(context)
+                                .replace("; wv", "")
+                                .replace(Regex(" Version/\\d+\\.\\d+"), "")
+                        webChromeClient = WebChromeClient()
                         settings.setSupportZoom(true)
                         settings.builtInZoomControls = true
                         settings.displayZoomControls = false

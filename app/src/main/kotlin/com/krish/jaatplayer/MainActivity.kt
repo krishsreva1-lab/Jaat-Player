@@ -7,6 +7,7 @@ import com.krish.jaatplayer.ui.screens.settings.RingtoneViewModel
 import com.krish.jaatplayer.ui.component.RingtoneTrimmerDialog
 import com.krish.jaatplayer.ui.component.RingtoneProgressDialog
 import com.krish.jaatplayer.ui.component.AppFloatingNavBar
+import com.krish.jaatplayer.ui.component.SettingsGlassLayer
 import com.krish.jaatplayer.ui.component.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.krish.jaatplayer.constants.UseFloatingNavBarKey
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -941,13 +942,18 @@ class MainActivity : ComponentActivity() {
                 val (liquidGlassNavBarEnabled) = rememberPreference(LiquidGlassNavBarEnabledKey, defaultValue = true)
                 val (liquidGlassMenuEnabled) = rememberPreference(LiquidGlassMenuEnabledKey, defaultValue = true)
                 val (liquidGlassAdoptThemeColor) = rememberPreference(LiquidGlassAdoptThemeColorKey, defaultValue = true)
+                val (appBackgroundStyle) = rememberEnumPreference(
+                    com.krish.jaatplayer.constants.AppBackgroundStyleKey,
+                    defaultValue = com.krish.jaatplayer.constants.AppBackgroundStyle.DEFAULT
+                )
+
                 val glassEffectConfig = remember(
                     liquidGlassGlobalEnabled, useFloatingNavBar, liquidGlassVibrancy, liquidGlassBlurRadius,
                     liquidGlassLensHeight, liquidGlassLensAmount, liquidGlassChromaticAberration,
                     liquidGlassDepthEffect, liquidGlassSurfaceTintColorInt,
                     liquidGlassSurfaceOpacity, liquidGlassTextColorInt, liquidGlassPlayerEnabled,
                     liquidGlassMiniPlayerEnabled, liquidGlassNavBarEnabled, liquidGlassMenuEnabled,
-                    liquidGlassAdoptThemeColor
+                    liquidGlassAdoptThemeColor, themeColor
                 ) {
                     GlassEffectConfig(
                         globalEnabled = liquidGlassGlobalEnabled && useFloatingNavBar,
@@ -957,7 +963,7 @@ class MainActivity : ComponentActivity() {
                         lensAmount = liquidGlassLensAmount,
                         chromaticAberration = liquidGlassChromaticAberration,
                         depthEffect = liquidGlassDepthEffect,
-                        surfaceTintColor = if (liquidGlassSurfaceTintColorInt == 0) Color.Unspecified else Color(liquidGlassSurfaceTintColorInt),
+                        surfaceTintColor = if (liquidGlassAdoptThemeColor) themeColor else if (liquidGlassSurfaceTintColorInt == 0) Color.Unspecified else Color(liquidGlassSurfaceTintColorInt),
                         adoptThemeColor = liquidGlassAdoptThemeColor,
                         surfaceOpacity = liquidGlassSurfaceOpacity,
                         textColor = if (liquidGlassTextColorInt == 0) Color.Unspecified else Color(liquidGlassTextColorInt),
@@ -970,7 +976,12 @@ class MainActivity : ComponentActivity() {
                 
                 val baseBg = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
                 val appBackdrop = rememberLayerBackdrop {
-                    drawRect(baseBg)
+                    drawAppBackgroundGraphics(
+                        style = appBackgroundStyle,
+                        themeColor = themeColor,
+                        baseBg = baseBg,
+                        isDark = useDarkTheme
+                    )
                     drawContent()
                 }
 
@@ -1291,7 +1302,19 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             Box(Modifier.weight(1f)) {
-                                
+                                val settingsGlassEnabled by rememberPreference(
+                                    com.krish.jaatplayer.constants.SettingsGlassEnabledKey,
+                                    defaultValue = false
+                                )
+                                val settingsGlassActive = settingsGlassEnabled &&
+                                    currentRoute?.startsWith("settings") == true &&
+                                    LocalGlassEffectConfig.current.globalEnabled &&
+                                    com.krish.jaatplayer.ui.component.isGlassSupported()
+
+                                SettingsGlassLayer(
+                                    active = settingsGlassActive,
+                                    appBackdrop = appBackdrop,
+                                ) {
                                 NavHost(
                                     navController = navController,
                                     startDestination = if (!setupCompleted) Screens.Setup.route else when (tabOpenedFromShortcut ?: defaultOpenTab) {
@@ -1373,6 +1396,7 @@ class MainActivity : ComponentActivity() {
                                         activity = this@MainActivity,
                                         snackbarHostState = snackbarHostState
                                     )
+                                }
                                 }
 
                                 if (shouldShowTopBar) {
@@ -1645,3 +1669,70 @@ val LocalDownloadUtil = staticCompositionLocalOf<DownloadUtil> { error("No Downl
 val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils provided") }
 val LocalListenTogetherManager = staticCompositionLocalOf<com.krish.jaatplayer.listentogether.ListenTogetherManager?> { null }
 val LocalIsPlayerExpanded = compositionLocalOf { false }
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAppBackgroundGraphics(
+    style: com.krish.jaatplayer.constants.AppBackgroundStyle,
+    themeColor: Color,
+    baseBg: Color,
+    isDark: Boolean,
+) {
+    drawRect(baseBg)
+    when (style) {
+        com.krish.jaatplayer.constants.AppBackgroundStyle.DEFAULT -> {
+        }
+        com.krish.jaatplayer.constants.AppBackgroundStyle.GRADIENT -> {
+            val alpha = if (isDark) 0.40f else 0.28f
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(themeColor.copy(alpha = alpha), baseBg)
+                )
+            )
+        }
+        com.krish.jaatplayer.constants.AppBackgroundStyle.BLUR -> {
+            val alpha = if (isDark) 0.35f else 0.25f
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(themeColor.copy(alpha = alpha), baseBg)
+                )
+            )
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(themeColor.copy(alpha = alpha * 0.8f), Color.Transparent),
+                    center = Offset(size.width * 0.5f, size.height * 0.25f),
+                    radius = size.width * 0.9f
+                )
+            )
+        }
+        com.krish.jaatplayer.constants.AppBackgroundStyle.GLOW_ANIMATED -> {
+            val c1 = themeColor.copy(alpha = if (isDark) 0.45f else 0.30f)
+            val c2 = themeColor.copy(alpha = if (isDark) 0.25f else 0.15f)
+            val b1 = Brush.radialGradient(
+                colors = listOf(c1, Color.Transparent),
+                center = Offset(size.width * 0.2f, size.height * 0.15f),
+                radius = size.width * 1.1f
+            )
+            val b2 = Brush.radialGradient(
+                colors = listOf(c2, Color.Transparent),
+                center = Offset(size.width * 0.8f, size.height * 0.6f),
+                radius = size.width * 1.0f
+            )
+            drawRect(b1)
+            drawRect(b2)
+        }
+        com.krish.jaatplayer.constants.AppBackgroundStyle.LIQUID_GLASS -> {
+            val strength = if (isDark) 0.38f else 0.28f
+            fun pool(color: Color, center: Offset, radius: Float) {
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colors = listOf(color.copy(alpha = strength), Color.Transparent),
+                        center = center,
+                        radius = radius,
+                    ),
+                )
+            }
+            pool(themeColor, Offset(size.width * 0.15f, size.height * 0.12f), size.width * 0.95f)
+            pool(themeColor.copy(alpha = 0.7f), Offset(size.width * 0.85f, size.height * 0.45f), size.width * 0.85f)
+            pool(themeColor.copy(alpha = 0.5f), Offset(size.width * 0.25f, size.height * 0.88f), size.width * 0.90f)
+        }
+    }
+}

@@ -258,6 +258,7 @@ import com.krish.jaatplayer.ui.player.CanvasArtworkPlaybackCache
 import com.krish.jaatplayer.ui.player.normalizeCanvasArtistName
 import com.krish.jaatplayer.ui.player.normalizeCanvasSongTitle
 import com.krish.jaatplayer.jaatcanvas.jaatCanvasProvider
+import com.krish.jaatplayer.spotify.SpotifyCanvasProvider
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
@@ -709,6 +710,7 @@ fun BottomSheetPlayer(
 
     var canvasArtwork by remember(mediaMetadata?.id) { mutableStateOf<CanvasArtwork?>(null) }
     var canvasFetchInFlight by remember(mediaMetadata?.id) { mutableStateOf(false) }
+    val canvasCtx = LocalContext.current.applicationContext
 
     LaunchedEffect(mediaMetadata?.id, playerBackground) {
         if (playerBackground != PlayerBackgroundStyle.APPLE_MUSIC || !enableCanvas) {
@@ -735,7 +737,9 @@ fun BottomSheetPlayer(
             val s = normalizeCanvasSongTitle(requestedTitle)
             val a = normalizeCanvasArtistName(requestedArtist)
             
-            val fetched = jaatCanvasProvider.getBySongArtist(s, a)
+            val fetched = SpotifyCanvasProvider.getBySongArtist(s, a, canvasCtx)
+                ?.takeIf { !it.preferredAnimationUrl.isNullOrBlank() }
+                ?: jaatCanvasProvider.getBySongArtist(s, a)
                 ?.takeIf { !it.preferredAnimationUrl.isNullOrBlank() }
                 ?: TidalCanvasProvider.getBySongArtist(s, a, requestedAlbum)
                 ?.takeIf { !it.preferredAnimationUrl.isNullOrBlank() }

@@ -251,6 +251,12 @@ fun AccountSettingsScreen(
                 title = stringResource(R.string.integrations),
                 items = listOf(
                     Material3SettingsItem(
+                        isHighlighted = (highlightKey == "spotify_integration" || highlightKey == "Spotify Connection" || highlightKey == "Import from Spotify"),
+                        icon = painterResource(R.drawable.ic_spotify),
+                        title = { Text("Spotify Connection & Import") },
+                        onClick = { navController.navigate("settings/spotify_import") }
+                    ),
+                    Material3SettingsItem(
                         isHighlighted = (highlightKey == stringResource(R.string.discord_integration)),
                         icon = painterResource(R.drawable.discord),
                         title = { Text(stringResource(R.string.discord_integration)) },

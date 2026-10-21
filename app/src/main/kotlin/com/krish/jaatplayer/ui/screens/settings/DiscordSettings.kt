@@ -1306,7 +1306,7 @@ fun RichPresence(
                                 when (largeImageType.lowercase()) {
                                     "thumbnail" -> song?.song?.thumbnailUrl
                                     "artist" -> song?.artists?.firstOrNull()?.thumbnailUrl
-                                    "appicon" -> "https://avatars.githubusercontent.com/u/258176326?s=200&v=4"
+                                    "appicon" -> "https://raw.githubusercontent.com/krishsreva1-lab/Jaat-Player/main/assets/jaat_logo.png"
                                     "custom" -> largeImageCustomUrl.ifBlank { song?.song?.thumbnailUrl }
                                     else -> song?.song?.thumbnailUrl
                                 }
@@ -1336,7 +1336,7 @@ fun RichPresence(
                                 when (smallImageType.lowercase()) {
                                     "thumbnail" -> songThumb
                                     "artist" -> artistThumb
-                                    "appicon" -> "https://avatars.githubusercontent.com/u/258176326?s=200&v=4"
+                                    "appicon" -> "https://raw.githubusercontent.com/krishsreva1-lab/Jaat-Player/main/assets/jaat_logo.png"
                                     "custom" -> smallImageCustomUrl.takeIf { it.isNotBlank() } ?: songThumb
                                     "dontshow", "none" -> null
                                     else -> artistThumb

@@ -32,6 +32,10 @@ import android.view.ViewGroup
 import android.view.TextureView
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 
+object CanvasDebug {
+    var playerError by androidx.compose.runtime.mutableStateOf<String?>(null)
+}
+
 @Composable
 fun CanvasArtworkPlayer(
     primaryUrl: String?,
@@ -138,6 +142,7 @@ fun CanvasArtworkPlayer(
         val listener =
             object : Player.Listener {
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    CanvasDebug.playerError = "${error.errorCodeName}"
                     val next =
                         when (currentUrl) {
                             primary -> fallback
@@ -150,6 +155,7 @@ fun CanvasArtworkPlayer(
                 }
 
                 override fun onRenderedFirstFrame() {
+                    CanvasDebug.playerError = null
                     isVideoReady = true
                 }
 

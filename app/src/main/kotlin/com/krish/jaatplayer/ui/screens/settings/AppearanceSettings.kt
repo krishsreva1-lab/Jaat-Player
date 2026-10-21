@@ -93,6 +93,8 @@ import com.krish.jaatplayer.constants.LyricsTextPositionKey
 import com.krish.jaatplayer.constants.LyricsTextSizeKey
 import com.krish.jaatplayer.constants.PlayerBackgroundStyle
 import com.krish.jaatplayer.constants.PlayerBackgroundStyleKey
+import com.krish.jaatplayer.constants.AppBackgroundStyle
+import com.krish.jaatplayer.constants.AppBackgroundStyleKey
 import com.krish.jaatplayer.constants.PlayerButtonsStyle
 import com.krish.jaatplayer.constants.PlayerButtonsStyleKey
 
@@ -240,6 +242,12 @@ highlightKey: String? = null) {
             MiniPlayerBackgroundStyleKey,
             defaultValue = PlayerBackgroundStyle.DEFAULT,
         )
+    val (appBackgroundStyle, onAppBackgroundStyleChange) =
+        rememberEnumPreference(
+            AppBackgroundStyleKey,
+            defaultValue = AppBackgroundStyle.DEFAULT,
+        )
+    var showAppBackgroundDialog by remember { mutableStateOf(false) }
 
     val (dynamicIslandEnabled, onDynamicIslandEnabledChange) = rememberPreference(
         DynamicIslandEnabledKey,
@@ -318,7 +326,7 @@ highlightKey: String? = null) {
     )
     val (canvasThumbnailAnimation, onCanvasThumbnailAnimationChange) = rememberPreference(
         CanvasThumbnailAnimationKey,
-        defaultValue = false
+        defaultValue = true
     )
     val (rotatingThumbnail, onRotatingThumbnailChange) = rememberPreference(
         RotatingThumbnailKey,
@@ -679,6 +687,28 @@ highlightKey: String? = null) {
                     PlayerBackgroundStyle.LIVE_MESH -> stringResource(R.string.live_mesh)
                     PlayerBackgroundStyle.LIQUID_GLASS -> stringResource(R.string.player_background_liquid_glass)
                     else -> stringResource(R.string.unknown)
+                }
+            }
+        )
+    }
+
+    if (showAppBackgroundDialog) {
+        EnumDialog(
+            onDismiss = { showAppBackgroundDialog = false },
+            onSelect = {
+                onAppBackgroundStyleChange(it)
+                showAppBackgroundDialog = false
+            },
+            title = "App Background Style",
+            current = appBackgroundStyle,
+            values = AppBackgroundStyle.entries,
+            valueText = {
+                when (it) {
+                    AppBackgroundStyle.DEFAULT -> stringResource(R.string.follow_theme)
+                    AppBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
+                    AppBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
+                    AppBackgroundStyle.GLOW_ANIMATED -> stringResource(R.string.glow_animated)
+                    AppBackgroundStyle.LIQUID_GLASS -> stringResource(R.string.player_background_liquid_glass)
                 }
             }
         )
@@ -1179,6 +1209,25 @@ highlightKey: String? = null) {
                     )
                 )
                 
+                add(
+                    Material3SettingsItem(
+                        isHighlighted = (highlightKey == "app_background_style" || highlightKey == "App Background Style"),
+                        icon = painterResource(R.drawable.palette),
+                        title = { Text("App Background Style") },
+                        description = {
+                            Text(
+                                when (appBackgroundStyle) {
+                                    AppBackgroundStyle.DEFAULT -> stringResource(R.string.follow_theme)
+                                    AppBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
+                                    AppBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
+                                    AppBackgroundStyle.GLOW_ANIMATED -> stringResource(R.string.glow_animated)
+                                    AppBackgroundStyle.LIQUID_GLASS -> stringResource(R.string.player_background_liquid_glass)
+                                }
+                            )
+                        },
+                        onClick = { showAppBackgroundDialog = true }
+                    )
+                )
                 val (liquidGlassAdoptThemeColor, onLiquidGlassAdoptThemeColorChange) = rememberPreference(
                     com.krish.jaatplayer.constants.LiquidGlassAdoptThemeColorKey,
                     defaultValue = true
@@ -1187,7 +1236,7 @@ highlightKey: String? = null) {
                     Material3SettingsItem(
                         icon = painterResource(R.drawable.palette),
                         title = { Text(stringResource(R.string.liquid_glass_adopt_theme_color)) },
-                        description = { Text(stringResource(R.string.liquid_glass_adopt_theme_color_desc)) },
+                        description = { Text("Adopt playing song banner / theme color for glass surfaces and app background") },
                         trailingContent = {
                             Switch(
                                 checked = liquidGlassAdoptThemeColor,
