@@ -708,7 +708,6 @@ highlightKey: String? = null) {
                     AppBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
                     AppBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
                     AppBackgroundStyle.GLOW_ANIMATED -> stringResource(R.string.glow_animated)
-                    AppBackgroundStyle.LIQUID_GLASS -> stringResource(R.string.player_background_liquid_glass)
                 }
             }
         )
@@ -1221,7 +1220,6 @@ highlightKey: String? = null) {
                                     AppBackgroundStyle.GRADIENT -> stringResource(R.string.gradient)
                                     AppBackgroundStyle.BLUR -> stringResource(R.string.player_background_blur)
                                     AppBackgroundStyle.GLOW_ANIMATED -> stringResource(R.string.glow_animated)
-                                    AppBackgroundStyle.LIQUID_GLASS -> stringResource(R.string.player_background_liquid_glass)
                                 }
                             )
                         },

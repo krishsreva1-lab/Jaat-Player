@@ -10,6 +10,15 @@ import com.krish.jaatplayer.ui.component.AppFloatingNavBar
 import com.krish.jaatplayer.ui.component.SettingsGlassLayer
 import com.krish.jaatplayer.ui.component.floatingtabbar.rememberFloatingTabBarScrollConnection
 import com.krish.jaatplayer.constants.UseFloatingNavBarKey
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
@@ -585,6 +594,12 @@ class MainActivity : ComponentActivity() {
             lyricsFontFamily = lyricsFontFamily,
             playerFontFamily = playerFontFamily,
         ) {
+            val currentSongMetadata by playerConnection?.service?.currentMediaMetadata?.collectAsState(initial = null) ?: remember { mutableStateOf(null) }
+            val (appBackgroundStyle) = rememberEnumPreference(
+                com.krish.jaatplayer.constants.AppBackgroundStyleKey,
+                defaultValue = com.krish.jaatplayer.constants.AppBackgroundStyle.DEFAULT
+            )
+
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
@@ -610,6 +625,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
             ) {
+                AppBackgroundLayer(
+                    style = appBackgroundStyle,
+                    themeColor = themeColor,
+                    thumbnailUrl = currentSongMetadata?.thumbnailUrl,
+                    pureBlack = pureBlack,
+                )
                 val focusManager = LocalFocusManager.current
                 val density = LocalDensity.current
                 val configuration = LocalWindowInfo.current
@@ -1042,6 +1063,7 @@ class MainActivity : ComponentActivity() {
                 ) {
 
                     Scaffold(
+                        containerColor = if (appBackgroundStyle != com.krish.jaatplayer.constants.AppBackgroundStyle.DEFAULT) Color.Transparent else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
                         snackbarHost = { SnackbarHost(snackbarHostState) },
                         topBar = {
                             AnimatedVisibility(
@@ -1074,8 +1096,8 @@ class MainActivity : ComponentActivity() {
                                         },
                                         scrollBehavior = topAppBarScrollBehavior,
                                         colors = TopAppBarDefaults.topAppBarColors(
-                                            containerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
-                                            scrolledContainerColor = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                                            containerColor = if (appBackgroundStyle != com.krish.jaatplayer.constants.AppBackgroundStyle.DEFAULT) Color.Transparent else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                                            scrolledContainerColor = if (appBackgroundStyle != com.krish.jaatplayer.constants.AppBackgroundStyle.DEFAULT) Color.Transparent else if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
                                             titleContentColor = MaterialTheme.colorScheme.onSurface,
                                             actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                             navigationIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1670,6 +1692,123 @@ val LocalSyncUtils = staticCompositionLocalOf<SyncUtils> { error("No SyncUtils p
 val LocalListenTogetherManager = staticCompositionLocalOf<com.krish.jaatplayer.listentogether.ListenTogetherManager?> { null }
 val LocalIsPlayerExpanded = compositionLocalOf { false }
 
+@Composable
+private fun AppBackgroundLayer(
+    style: com.krish.jaatplayer.constants.AppBackgroundStyle,
+    themeColor: Color,
+    thumbnailUrl: String?,
+    pureBlack: Boolean,
+) {
+    val context = LocalContext.current
+    val baseBg = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+
+    Box(modifier = Modifier.fillMaxSize().background(baseBg)) {
+        when (style) {
+            com.krish.jaatplayer.constants.AppBackgroundStyle.DEFAULT -> {
+            }
+            com.krish.jaatplayer.constants.AppBackgroundStyle.GRADIENT -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    themeColor.copy(alpha = if (isDark) 0.55f else 0.40f),
+                                    baseBg
+                                )
+                            )
+                        )
+                )
+            }
+            com.krish.jaatplayer.constants.AppBackgroundStyle.BLUR -> {
+                if (!thumbnailUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(thumbnailUrl)
+                            .size(150, 150)
+                            .allowHardware(false)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .blur(if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) 100.dp else 0.dp)
+                            .alpha(0.40f)
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        themeColor.copy(alpha = 0.45f),
+                                        baseBg
+                                    )
+                                )
+                            )
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(baseBg.copy(alpha = if (isDark) 0.50f else 0.60f))
+                )
+            }
+            com.krish.jaatplayer.constants.AppBackgroundStyle.GLOW_ANIMATED -> {
+                val infiniteTransition = rememberInfiniteTransition(label = "AppGlowAnimation")
+                val progress by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(20000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "glowProgress"
+                )
+                val c1 = themeColor.copy(alpha = if (isDark) 0.55f else 0.40f)
+                val c2 = MaterialTheme.colorScheme.tertiary.copy(alpha = if (isDark) 0.40f else 0.30f)
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .drawBehind {
+                            val p = progress
+                            val width = size.width
+                            val height = size.height
+
+                            fun oscillate(min: Float, max: Float, phase: Float): Float {
+                                val v = kotlin.math.sin(2f * kotlin.math.PI.toFloat() * (p + phase))
+                                return min + (max - min) * ((v + 1f) * 0.5f)
+                            }
+
+                            val o1x = oscillate(0.1f, 0.8f, 0.0f)
+                            val o1y = oscillate(0.1f, 0.6f, 0.2f)
+                            val o2x = oscillate(0.9f, 0.2f, 0.4f)
+                            val o2y = oscillate(0.5f, 0.9f, 0.6f)
+
+                            val b1 = Brush.radialGradient(
+                                colors = listOf(c1, Color.Transparent),
+                                center = Offset(width * o1x, height * o1y),
+                                radius = width * 1.2f
+                            )
+                            val b2 = Brush.radialGradient(
+                                colors = listOf(c2, Color.Transparent),
+                                center = Offset(width * o2x, height * o2y),
+                                radius = width * 1.0f
+                            )
+
+                            drawRect(baseBg)
+                            drawRect(b1)
+                            drawRect(b2)
+                        }
+                )
+            }
+        }
+    }
+}
+
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAppBackgroundGraphics(
     style: com.krish.jaatplayer.constants.AppBackgroundStyle,
     themeColor: Color,
@@ -1718,21 +1857,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAppBackgroundGr
             )
             drawRect(b1)
             drawRect(b2)
-        }
-        com.krish.jaatplayer.constants.AppBackgroundStyle.LIQUID_GLASS -> {
-            val strength = if (isDark) 0.38f else 0.28f
-            fun pool(color: Color, center: Offset, radius: Float) {
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(color.copy(alpha = strength), Color.Transparent),
-                        center = center,
-                        radius = radius,
-                    ),
-                )
-            }
-            pool(themeColor, Offset(size.width * 0.15f, size.height * 0.12f), size.width * 0.95f)
-            pool(themeColor.copy(alpha = 0.7f), Offset(size.width * 0.85f, size.height * 0.45f), size.width * 0.85f)
-            pool(themeColor.copy(alpha = 0.5f), Offset(size.width * 0.25f, size.height * 0.88f), size.width * 0.90f)
         }
     }
 }

@@ -375,6 +375,8 @@ fun GlassEffectSettings(
         val (sleepTimerMenuEnabled, onSleepTimerMenuEnabledChange) = rememberPreference(LiquidGlassSleepTimerMenuEnabledKey, defaultValue = false)
         val (equalizerMenuEnabled, onEqualizerMenuEnabledChange) = rememberPreference(LiquidGlassEqualizerMenuEnabledKey, defaultValue = true)
         val (settingsMenuEnabled, onSettingsMenuEnabledChange) = rememberPreference(LiquidGlassSettingsMenuEnabledKey, defaultValue = false)
+        val (settingsGlassEnabled, onSettingsGlassEnabledChange) = rememberPreference(SettingsGlassEnabledKey, defaultValue = true)
+        val (searchDockPuckStyle, onSearchDockPuckStyleChange) = rememberPreference(SearchDockPuckStyleKey, defaultValue = true)
         val (menuBlur, onMenuBlurChange) = rememberPreference(LiquidGlassMenuBlurRadiusKey, defaultValue = 12f)
         val (menuVibrancy, onMenuVibrancyChange) = rememberPreference(LiquidGlassMenuVibrancyKey, defaultValue = 1f)
         val (menuLensHeight, onMenuLensHeightChange) = rememberPreference(LiquidGlassMenuLensHeightKey, defaultValue = 0.5f)
@@ -523,6 +525,18 @@ fun GlassEffectSettings(
                     description = { Text("True glass effect for the account/settings popup, showing the mini player and nav bar behind it") },
                     trailingContent = { Switch(checked = settingsMenuEnabled, onCheckedChange = onSettingsMenuEnabledChange) },
                     onClick = { onSettingsMenuEnabledChange(!settingsMenuEnabled) }
+                ),
+                Material3SettingsItem(
+                    title = { Text("Settings Screen Liquid Glass") },
+                    description = { Text("Apply liquid glass effect to cards on Settings screens") },
+                    trailingContent = { Switch(checked = settingsGlassEnabled, onCheckedChange = onSettingsGlassEnabledChange) },
+                    onClick = { onSettingsGlassEnabledChange(!settingsGlassEnabled) }
+                ),
+                Material3SettingsItem(
+                    title = { Text("Search Screen Liquid Glass") },
+                    description = { Text("Water-drop glass puck on the Search page dock") },
+                    trailingContent = { Switch(checked = searchDockPuckStyle, onCheckedChange = onSearchDockPuckStyleChange) },
+                    onClick = { onSearchDockPuckStyleChange(!searchDockPuckStyle) }
                 ),
             )
         )

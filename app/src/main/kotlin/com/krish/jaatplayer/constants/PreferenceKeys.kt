@@ -479,7 +479,6 @@ enum class AppBackgroundStyle {
     GRADIENT,
     BLUR,
     GLOW_ANIMATED,
-    LIQUID_GLASS,
 }
 
 val TopSize = stringPreferencesKey("topSize")
